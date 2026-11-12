@@ -3,3 +3,6 @@ dist/
 .env
 .env.local
 *.log
+
+# Audios de referencia de la voz (son de una persona: no van al repositorio)
+voz/*.wav

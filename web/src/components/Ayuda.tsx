@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { invocar, supabase } from '../lib/supabase'
 import { areaDe, CIRCUITOS, type Circuito } from '../lib/guias'
 import Chichito, { trajeDe } from './Chichito'
+import { callarVoz, decir } from '../lib/voz'
 
 interface Sug { tema: string; clave: string; prioridad: number; posponer?: string; titulo: string; texto: string; boton: string; ir?: string; circuito?: string }
 interface Memoria { tema: string; estado: 'nunca' | 'pospuesta' | 'aceptada'; hasta: string | null }
@@ -56,22 +57,16 @@ export default function Ayuda() {
   }
 
   // ------------------------------------------------ voz y boca
-  const hablar = useCallback((texto: string) => {
+  const hablar = useCallback((texto: string, grabada?: string) => {
     setHabla(true); window.setTimeout(() => setHabla(false), Math.min(4000, 600 + texto.length * 25))
-    if (!voz || !('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(texto)
-    const v = window.speechSynthesis.getVoices().find((x) => /es[-_]AR/i.test(x.lang)) ?? window.speechSynthesis.getVoices().find((x) => x.lang.startsWith('es'))
-    if (v) u.voice = v
-    u.lang = v?.lang ?? 'es-AR'; u.rate = 1.03
-    window.speechSynthesis.speak(u)
+    if (voz) void decir(texto, grabada)
   }, [voz])
-  useEffect(() => () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel() }, [])
+  useEffect(() => () => callarVoz(), [])
 
   // ------------------------------------------------ bienvenida y avisos urgentes
   useEffect(() => {
     const k = `uv-hola-${perfil!.id}`
-    if (!leerLS(k)) { escribirLS(k, '1'); setAbierto(true); hablar(`¡Hola ${perfil!.nombre.split(' ')[0]}! Soy Chichito. Tocame cuando necesites una mano.`) }
+    if (!leerLS(k)) { escribirLS(k, '1'); setAbierto(true); hablar(`¡Hola ${perfil!.nombre.split(' ')[0]}! Soy Chichito. Tocame cuando necesites una mano.`, '¡Hola! Soy Chichito. Tocame cuando necesites una mano.') }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
@@ -138,7 +133,7 @@ export default function Ayuda() {
   const deRol = CIRCUITOS.filter((c) => c.roles.includes(rol))
   const aqui = deRol.filter((c) => c.area === area), otros = deRol.filter((c) => c.area !== area)
   const p = tour?.c.pasos[tour.paso]
-  const alternarVoz = () => { const v = !voz; setVoz(v); escribirLS(VOZ, v ? '1' : '0'); if (!v && 'speechSynthesis' in window) window.speechSynthesis.cancel() }
+  const alternarVoz = () => { const v = !voz; setVoz(v); escribirLS(VOZ, v ? '1' : '0'); if (!v) callarVoz() }
 
   let globo = null
   if (tour && p) {

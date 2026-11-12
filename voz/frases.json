@@ -1,0 +1,202 @@
+[
+ {
+  "id": "1a682b72",
+  "texto": "¡Hola! Soy Chichito. Tocame cuando necesites una mano."
+ },
+ {
+  "id": "f47fa7c0",
+  "texto": "¡Listo!"
+ },
+ {
+  "id": "95c8535c",
+  "texto": "¡Ey! Mirá lo que te dejé escrito."
+ },
+ {
+  "id": "1500796d",
+  "texto": "1. Mesas. ¡Hola! Así se ve el salón. Tocás una mesa libre, la abrís con los comensales y cargás el pedido."
+ },
+ {
+  "id": "c637dfc0",
+  "texto": "2. Parrilla. La comanda llega sola acá. El parrillero toca Empezar y después Listo, y el mozo ve que tiene que retirar."
+ },
+ {
+  "id": "39dd73de",
+  "texto": "3. Barra. Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida."
+ },
+ {
+  "id": "55cd0330",
+  "texto": "4. Caja. Cuando la mesa pide la cuenta, se cobra con el medio de pago. Al cobrar se descuentan solos los artículos de cada plato."
+ },
+ {
+  "id": "3d3e500b",
+  "texto": "5. Compras. Al otro día, esta lista te dice qué comprar y cuánto, según lo que se vende cada día de la semana."
+ },
+ {
+  "id": "fc2935ac",
+  "texto": "6. Tableros. Y acá ves cómo vino la noche, el mes y la plata. ¡Listo, ya conocés todo!"
+ },
+ {
+  "id": "319e30c6",
+  "texto": "Elegí la mesa. Tocá una mesa libre. Se abre el panel con el botón Abrir mesa: poné cuántos son."
+ },
+ {
+  "id": "1f3ee6a0",
+  "texto": "Cargá el pedido. Tocá los productos, agregá aclaraciones si hace falta y mandá. La parrilla y la barra lo reciben al instante."
+ },
+ {
+  "id": "4ae2dc92",
+  "texto": "Los avisos. Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar."
+ },
+ {
+  "id": "7f51a8c8",
+  "texto": "El link para clientes. Compartí este link en Instagram y WhatsApp, o imprimí el QR. El cliente elige día, horario y cuántos son, y te llega acá."
+ },
+ {
+  "id": "083f752e",
+  "texto": "Las que te piden por teléfono. Si te reservan por teléfono o en el local, cargalas acá: entran confirmadas."
+ },
+ {
+  "id": "5261fe64",
+  "texto": "Cada noche. Elegí el día y ves las reservas por horario, con cuántos lugares quedan. Las de la página entran por confirmar: tocás Confirmar y se abre WhatsApp con el mensaje listo."
+ },
+ {
+  "id": "95990cdf",
+  "texto": "Cuando llegan. En Mesas aparece la próxima reserva. Tocá Llegaron: sentar, elegí la mesa y se abre sola con los comensales."
+ },
+ {
+  "id": "c5d57327",
+  "texto": "Tres columnas. Pendientes, preparando y listos. Cada comanda muestra la mesa y hace cuánto entró."
+ },
+ {
+  "id": "f6a43fe5",
+  "texto": "El reloj. Si una comanda tarda mucho se pone amarilla y después roja. Tocá Listo apenas sale, así medimos los tiempos."
+ },
+ {
+  "id": "47772561",
+  "texto": "Al empezar. Cargá el efectivo con el que arrancás la noche."
+ },
+ {
+  "id": "affc9f96",
+  "texto": "Cobrar. Primero aparecen las mesas que pidieron la cuenta. Tocá Cobrar, elegí el medio y, si hace falta, el descuento."
+ },
+ {
+  "id": "7b8c5707",
+  "texto": "Gastos chicos. Si pagás algo con la plata de la caja (hielo, un proveedor), cargalo acá así el cierre da justo."
+ },
+ {
+  "id": "ee150d7c",
+  "texto": "Al terminar. Contá la plata y cargala. Te digo si sobra o falta."
+ },
+ {
+  "id": "c113ef2b",
+  "texto": "Lo que comprás. Cada cosa que comprás es un artículo: vacío, papas, gin. Poné la unidad, el costo, el mínimo y la merma de limpieza."
+ },
+ {
+  "id": "e53d1172",
+  "texto": "Recetas y costos. Poné cuánto lleva de cada artículo, limpio y por porción (por ejemplo 0,4 kg de vacío). Te muestro el costo y cuánto deja."
+ },
+ {
+  "id": "6a1c3f74",
+  "texto": "Lo que entró. Tocá Cargar compra y anotá cada artículo con la cantidad y lo que pagaste. Suma al stock y queda el gasto, aparte de lo que calculan las recetas."
+ },
+ {
+  "id": "5574e46a",
+  "texto": "Compras cargadas. Acá ves lo que se cargó el último mes. Si una quedó mal o repetida, abrila y anulala: se saca del stock y se borra el gasto."
+ },
+ {
+  "id": "5b054ca8",
+  "texto": "La factura. Sacale foto o subí el PDF. Leo cada línea y te muestro todo para revisar antes de cargar: entra al stock y queda el gasto."
+ },
+ {
+  "id": "410e083b",
+  "texto": "Qué comprar. Esta lista se arma con lo que hay, lo que se vende cada día y el colchón que elegiste en Configuración."
+ },
+ {
+  "id": "f9719a4c",
+  "texto": "Pesá la pieza. Cuando llega la carne, pesala cruda, limpia y una porción cocida. Con 3 o 4 pruebas sabés cuánto perdés de verdad en cada corte y el costo real por porción."
+ },
+ {
+  "id": "c37da77c",
+  "texto": "La tabla de referencia. Mientras no tengas pruebas, acá están los valores aproximados de limpieza, cocción y porción de carnes, pescados, guarniciones, pastas y barra. Podés crear el artículo directo desde la tabla."
+ },
+ {
+  "id": "c082d124",
+  "texto": "Contar todo. Una vez por semana, al cierre, contá lo que hay. Con dos inventarios te muestro qué falta sin explicación y cuánta plata es."
+ },
+ {
+  "id": "61c0d4be",
+  "texto": "Cada cosa que se tira. Si algo se venció, se quemó o lo devolvieron, cargalo con el motivo. Así sabemos qué ajustar."
+ },
+ {
+  "id": "7541e296",
+  "texto": "Desde, hasta y más. Elegí el período y filtrá por plato, mozo, día o medio de pago. Con Comparar ves si subió o bajó contra el período anterior."
+ },
+ {
+  "id": "54e10e1d",
+  "texto": "Cuándo se vende. El mapa de calor te dice qué días y horas se mueve más plata: sirve para armar los turnos."
+ },
+ {
+  "id": "373aff2d",
+  "texto": "Rentabilidad. Cuánto deja cada plato por unidad y en total en el período."
+ },
+ {
+  "id": "e8a45a5b",
+  "texto": "Estrellas y para revisar. Cruzo lo que se vende con lo que deja: qué cuidar, qué subir de precio y qué podrías sacar de la carta."
+ },
+ {
+  "id": "e2408c01",
+  "texto": "Nuevo proveedor. Nombre, CUIT, teléfono y plazo de pago. Si te da 30 días, las facturas quedan a pagar con su vencimiento."
+ },
+ {
+  "id": "15401142",
+  "texto": "Gastos. Alquiler, luz, sueldos: cargalos acá, pagados o pendientes con vencimiento."
+ },
+ {
+  "id": "24fc3da6",
+  "texto": "Por pagar. Acá está todo lo que se debe. Tocá Pagar y elegí de qué cuenta sale la plata."
+ },
+ {
+  "id": "63bc57c1",
+  "texto": "Cuentas. El saldo de la caja, el banco y Mercado Pago se calcula solo con lo cobrado y lo pagado."
+ },
+ {
+  "id": "631d817f",
+  "texto": "1. Los datos. CUIT y razón social del monotributista, domicilio, ingresos brutos y el punto de venta que crearon en ARCA para Web Services."
+ },
+ {
+  "id": "e36d8fcd",
+  "texto": "2. El certificado. Bajá el pedido (.csr), con eso en ARCA te dan el certificado (.crt) y lo subís acá. Abrí \"Cómo se saca\" para ver los pasos en ARCA."
+ },
+ {
+  "id": "f0b5d2d4",
+  "texto": "3. Probar. Empezá en modo prueba y tocá Probar conexión. Si da bien, ya podés hacer facturas de prueba al cobrar."
+ },
+ {
+  "id": "8846347a",
+  "texto": "4. Activar. Activá y listo: al cobrar cada mesa sale la Factura C con CAE y QR, para imprimir o mandar por WhatsApp."
+ },
+ {
+  "id": "43dd9ff8",
+  "texto": "Invitar. Poné el nombre, el mail y el rol. Le llega un mail para elegir su contraseña y entra viendo solo lo suyo."
+ },
+ {
+  "id": "c044177f",
+  "texto": "Nuevo producto. Nombre, categoría y precio. Si es una botella o lata, marcá que se cuenta por unidad. Si se acaba, pausalo."
+ },
+ {
+  "id": "8a58810b",
+  "texto": "Un QR por mesa. Imprimí la hoja y pegá cada QR en su mesa. El cliente escanea, ve la carta, pide y llama al mozo."
+ },
+ {
+  "id": "cb8ffa26",
+  "texto": "Todavía no abriste la caja de hoy. Cargá el efectivo inicial así el cierre da justo."
+ },
+ {
+  "id": "5911db69",
+  "texto": "Con la próxima pieza de carne que llegue, hacé una prueba de rendimiento: pesala cruda y limpia."
+ },
+ {
+  "id": "c191129c",
+  "texto": "Las facturas salen contra el ambiente de prueba de ARCA: no valen. Cuando esté todo bien, pasá a producción en Facturación."
+ }
+]
