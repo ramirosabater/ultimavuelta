@@ -1,11 +1,13 @@
 // Versión en un solo archivo para pegar en Supabase → Edge Functions → Deploy a new function → Via Editor (nombre: ia).
-// Se genera desde supabase/functions/ia/index.ts: si cambia aquel, regenerar este.
+// Se genera con scripts/empaquetar-funciones.py desde supabase/functions/ia/: si cambia aquello, regenerar este.
 // Función "ia": lo que la app le pide a Claude (API de Anthropic). La clave queda en el servidor.
 //   tipo "factura":  lee una foto o PDF de una factura y devuelve las líneas asociadas a los artículos. Solo gestión.
 //   tipo "pregunta": Chichito responde una pregunta con los datos del local que puede ver quien pregunta.
 // Secretos: ANTHROPIC_API_KEY. Opcionales: IA_MODELO_FACTURA, IA_MODELO_PREGUNTAS.
-// ---- utilidades compartidas (copia de supabase/functions/_compartido/comun.ts) ----
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+
+// ---- supabase/functions/_compartido/comun.ts ----
+// Utilidades compartidas por las funciones de Supabase de Última Vuelta
 
 const env = (k: string, def = '') => Deno.env.get(k) ?? def
 
@@ -44,8 +46,7 @@ async function quienLlama(req: Request): Promise<{ id: string; rol: Rol; nombre:
 
 const esGestion = (rol: Rol) => rol === 'admin' || rol === 'encargado'
 
-// ---- fin de las utilidades ----
-
+// ---- la función ----
 const API = () => env('ANTHROPIC_URL', 'https://api.anthropic.com') + '/v1/messages'
 const MODELO_FACTURA = () => env('IA_MODELO_FACTURA', 'claude-sonnet-5-5')
 const MODELO_PREGUNTAS = () => env('IA_MODELO_PREGUNTAS', 'claude-haiku-5-5')
@@ -140,7 +141,8 @@ const MAPA = `Secciones de la app (menú de arriba):
 - Caja (/caja): abrir la caja con el efectivo inicial, gastos pagados con la caja, cobrar mesas y cerrar contando el efectivo.
 - Stock: Artículos (/stock/articulos: lo que se compra, compra, merma, contar), Recetas y costos (/stock/recetas), Rendimientos (/stock/rendimientos: pesar crudo, limpio y cocido, y la tabla de referencia con limpieza, cocción y porción típica de carnes, pescados, guarniciones, pastas y barra), Recetas: cada ingrediente se carga "al plato" (cocido) o "limpio crudo", Compras (/stock/compras: lista de compras calculada y cargar factura con foto o PDF), Control semanal (/stock/control: inventario completo y lo que falta sin explicar), Mermas (/stock/mermas).
 - Tableros: Resumen, Ventas y servicio, Costos y desperdicio, Finanzas, con filtros desde/hasta, plato, mozo, día, medio de pago, artículo y proveedor.
-- Administración: Proveedores, Gastos (por pagar y pagar), Cuentas (caja, banco, Mercado Pago, transferencias), Usuarios (solo dueños), Configuración.
+- Administración: Proveedores, Gastos (por pagar y pagar), Cuentas (caja, banco, Mercado Pago, transferencias), Usuarios (solo dueños), Facturación (solo dueños: factura electrónica con ARCA, Factura C de monotributo; datos del bar, certificado, probar conexión y activar), Configuración.
+- Facturas: al cobrar una mesa, "Cobrar y facturar" hace la Factura C con CAE y QR, para imprimir o mandar por WhatsApp. Desde $10.000.000 hay que cargar el DNI o CUIT del cliente. En Caja, la columna Factura muestra cada una; las que no salieron (ARCA caído) se hacen con "Facturar" o "Reintentar". "Anular" hace la nota de crédito.
 - Carta y QR: productos, precios, categorías, pausar lo agotado, mesas y QR para imprimir.`
 
 async function responder(req: Request, b: { pregunta?: string; pantalla?: string }) {

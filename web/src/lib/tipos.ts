@@ -82,3 +82,16 @@ export interface Reserva {
   nota: string | null; estado: EstadoReserva; origen: 'web' | 'telefono' | 'local'; mesa_id: number | null
   creado: string; creado_por: string | null; atendido: string | null; cancelada_por: 'cliente' | 'local' | null
 }
+
+export interface Factura {
+  id: number; codigo: string; ticket_id: number | null; tipo: 11 | 13; punto_venta: number; numero: number | null; fecha: string; total: number
+  doc_tipo: number; doc_nro: number; receptor: string | null; cond_iva_receptor: number; estado: 'pendiente' | 'autorizada' | 'rechazada'
+  cae: string | null; cae_vence: string | null; error: string | null; observaciones: string | null; ambiente: 'homologacion' | 'produccion'
+  asociada_id: number | null; anulada: boolean; creado: string
+}
+export interface ConfigFacturacion {
+  cuit: string | null; razon_social: string | null; nombre_fantasia: string | null; domicilio: string | null; iibb: string | null
+  inicio_actividades: string | null; punto_venta: number | null; ambiente: 'homologacion' | 'produccion'; activa: boolean; facturar_siempre: boolean
+  tope_identificar: number; csr: string | null; cert_homologacion: string | null; cert_produccion: string | null
+  vence_homologacion: string | null; vence_produccion: string | null; ultima_prueba: string | null; ultima_prueba_ok: boolean | null; ultima_prueba_msg: string | null
+}

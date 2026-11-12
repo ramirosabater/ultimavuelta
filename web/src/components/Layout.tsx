@@ -97,6 +97,7 @@ export default function Layout() {
       { to: '/admin/gastos', b: 'Gastos', s: 'Lo pagado y lo que hay que pagar', n: n.vencidos },
       { to: '/admin/cuentas', b: 'Cuentas', s: 'Caja, banco, Mercado Pago' },
       { to: '/admin/usuarios', b: 'Usuarios', s: 'Quién entra y qué puede hacer', roles: ['admin'] },
+      { to: '/admin/facturacion', b: 'Facturación', s: 'Factura electrónica con ARCA', roles: ['admin'] },
       { to: '/admin/configuracion', b: 'Configuración', s: 'Nombre, jornada, compras y alertas', roles: ['admin'] },
     ] },
     { t: 'Carta y QR', base: ['/carta'], roles: GESTION, items: [

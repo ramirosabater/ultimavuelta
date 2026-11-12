@@ -69,6 +69,24 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | Archivo | Qué agrega |
 |---|---|
 | `01-reservas.sql` | Reservas: página pública para clientes, cupo por horario, confirmar por WhatsApp y sentar en una mesa |
+| `02-facturacion.sql` | Factura electrónica con ARCA (después, publicar la función `arca`: ver abajo) |
+
+## Factura electrónica (ARCA)
+
+Monotributo: la app hace **Factura C** al cobrar cada mesa, directo con ARCA, con CAE y QR.
+
+1. **Supabase → Edge Functions → Deploy a new function → Via Editor**. Nombre: `arca`. Pegá todo `puesta-en-marcha/funciones/arca.ts`
+   → **Deploy function**. No necesita secretos nuevos.
+2. En la app, **Administración → Facturación** (solo dueños), los cuatro pasos:
+   1. Datos del bar: CUIT y razón social del titular del monotributo, domicilio comercial, ingresos brutos, inicio de actividades
+      y el punto de venta para Web Services.
+   2. Certificado: bajar el pedido (`ultimavuelta.csr`), sacar el certificado en ARCA (los pasos están en la misma pantalla,
+      "Cómo se saca el certificado en ARCA") y subir el `.crt`. Primero el de **prueba (homologación)**.
+   3. Probar la conexión.
+   4. Activar. Hacer unas facturas de prueba cobrando mesas. Cuando todo esté bien: sacar el certificado de producción,
+      crear el punto de venta real, cargarlo, pasar a **Real (producción)** y probar de nuevo.
+3. Si ARCA está caído al cobrar, la mesa se cobra igual y la factura queda **pendiente**: en **Caja**, columna Factura → Reintentar.
+   Chichito avisa si quedan ventas sin factura. **Anular** hace la nota de crédito.
 
 ## Rutina recomendada
 
@@ -82,6 +100,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | Una vez por semana, al cierre | Inventario completo | Stock → Control semanal |
 | Una vez por semana | Mirar Costos y desperdicio | Tableros |
 | Cada tarde | Confirmar las reservas que entraron por la página | Reservas |
+| Al cierre | Revisar que no queden mesas sin factura | Caja |
 
 ## Si algo falla
 

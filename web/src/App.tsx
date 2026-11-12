@@ -30,6 +30,8 @@ const Gastos = lazy(() => import('./pages/admin/Gastos'))
 const Cuentas = lazy(() => import('./pages/admin/Cuentas'))
 const Usuarios = lazy(() => import('./pages/admin/Usuarios'))
 const Configuracion = lazy(() => import('./pages/admin/Configuracion'))
+const Facturacion = lazy(() => import('./pages/admin/Facturacion'))
+const FacturaPublica = lazy(() => import('./pages/Factura'))
 const Carta = lazy(() => import('./pages/carta/Carta'))
 const MesasQR = lazy(() => import('./pages/carta/MesasQR'))
 
@@ -79,6 +81,7 @@ function Privado() {
         <Route path="cuentas" element={<Solo roles={G}><Cuentas /></Solo>} />
         <Route path="usuarios" element={<Solo roles={['admin']}><Usuarios /></Solo>} />
         <Route path="configuracion" element={<Solo roles={['admin']}><Configuracion /></Solo>} />
+        <Route path="facturacion" element={<Solo roles={['admin']}><Facturacion /></Solo>} />
       </Route>
       <Route path="carta" element={<Solo roles={G}><Carta /></Solo>} />
       <Route path="carta/mesas" element={<Solo roles={G}><MesasQR /></Solo>} />
@@ -91,6 +94,7 @@ export default function App() {
   return <BrowserRouter><ToastProvider><Routes>
     {/* La carta del QR y las reservas son públicas: no pasan por el ingreso */}
     <Route path="/m/:token" element={<Suspense fallback={null}><Publico /></Suspense>} />
+    <Route path="/factura/:codigo" element={<Suspense fallback={null}><FacturaPublica /></Suspense>} />
     <Route path="/reservar" element={<Suspense fallback={null}><Reservar /></Suspense>} />
     <Route path="/reserva/:codigo" element={<Suspense fallback={null}><Reservar /></Suspense>} />
     <Route path="/elegir-clave" element={<AuthProvider><ElegirClave /></AuthProvider>} />

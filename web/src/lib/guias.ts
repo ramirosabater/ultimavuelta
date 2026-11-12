@@ -73,6 +73,12 @@ export const CIRCUITOS: Circuito[] = [
     { ir: '/admin/gastos', foco: 'por-pagar', titulo: 'Por pagar', texto: 'Acá está todo lo que se debe. Tocá Pagar y elegí de qué cuenta sale la plata.' },
     { ir: '/admin/cuentas', foco: 'saldos', titulo: 'Cuentas', texto: 'El saldo de la caja, el banco y Mercado Pago se calcula solo con lo cobrado y lo pagado.' },
   ] },
+  { id: 'facturacion', titulo: 'Configurar la factura electrónica', area: 'admin', roles: ['admin'], pasos: [
+    { ir: '/admin/facturacion', foco: 'fac-datos', titulo: '1. Los datos', texto: 'CUIT y razón social del monotributista, domicilio, ingresos brutos y el punto de venta que crearon en ARCA para Web Services.' },
+    { ir: '/admin/facturacion', foco: 'fac-certificado', titulo: '2. El certificado', texto: 'Bajá el pedido (.csr), con eso en ARCA te dan el certificado (.crt) y lo subís acá. Abrí "Cómo se saca" para ver los pasos en ARCA.' },
+    { ir: '/admin/facturacion', foco: 'fac-probar', titulo: '3. Probar', texto: 'Empezá en modo prueba y tocá Probar conexión. Si da bien, ya podés hacer facturas de prueba al cobrar.' },
+    { ir: '/admin/facturacion', foco: 'fac-activar', titulo: '4. Activar', texto: 'Activá y listo: al cobrar cada mesa sale la Factura C con CAE y QR, para imprimir o mandar por WhatsApp.' },
+  ] },
   { id: 'usuarios', titulo: 'Invitar a alguien del equipo', area: 'admin', roles: ['admin'], pasos: [
     { ir: '/admin/usuarios', foco: 'invitar', titulo: 'Invitar', texto: 'Poné el nombre, el mail y el rol. Le llega un mail para elegir su contraseña y entra viendo solo lo suyo.' },
   ] },

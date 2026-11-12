@@ -1,10 +1,12 @@
 // Versión en un solo archivo para pegar en Supabase → Edge Functions → Deploy a new function → Via Editor (nombre: usuarios).
-// Se genera desde supabase/functions/usuarios/index.ts: si cambia aquel, regenerar este.
+// Se genera con scripts/empaquetar-funciones.py desde supabase/functions/usuarios/: si cambia aquello, regenerar este.
 // Función "usuarios": un dueño invita a alguien al sistema (le llega un mail para elegir su contraseña).
 // Crear usuarios necesita la clave de servicio, por eso se hace acá y no desde el navegador.
 // Rol, nombre y alta/baja de un usuario existente se cambian directo desde la app (lo permiten los permisos de admin).
-// ---- utilidades compartidas (copia de supabase/functions/_compartido/comun.ts) ----
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+
+// ---- supabase/functions/_compartido/comun.ts ----
+// Utilidades compartidas por las funciones de Supabase de Última Vuelta
 
 const env = (k: string, def = '') => Deno.env.get(k) ?? def
 
@@ -43,8 +45,7 @@ async function quienLlama(req: Request): Promise<{ id: string; rol: Rol; nombre:
 
 const esGestion = (rol: Rol) => rol === 'admin' || rol === 'encargado'
 
-// ---- fin de las utilidades ----
-
+// ---- la función ----
 interface Pedido { email?: string; nombre?: string; rol?: string }
 const ROLES = ['admin', 'encargado', 'mozo', 'cocina', 'barra']
 

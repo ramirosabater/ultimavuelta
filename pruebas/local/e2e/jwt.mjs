@@ -12,4 +12,4 @@ export const USUARIOS = {
 }
 export const ANON = jwt({ role: 'anon' })
 export const de = (rol) => jwt({ role: 'authenticated', sub: USUARIOS[rol] })
-if (process.argv[2]) console.log(process.argv[2] === 'anon' ? ANON : de(process.argv[2]))
+if (process.argv[2]) console.log(process.argv[2] === 'anon' ? ANON : process.argv[2] === 'service_role' ? jwt({ role: 'service_role' }) : de(process.argv[2]))

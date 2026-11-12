@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { rpc, tabla, useConsulta } from '../lib/datos'
 import { supabase } from '../lib/supabase'
 import { fecha, jornada, plata } from '../lib/formato'
-import type { Categoria, MedioPago, Mesa, PedidoItem, Producto } from '../lib/tipos'
+import type { Categoria, Factura, MedioPago, Mesa, PedidoItem, Producto } from '../lib/tipos'
 import { Modal, useAccion } from './ui'
+import { facturarTicket, type EstadoFacturacion, type Receptor } from '../lib/factura'
+import { CamposReceptor, ResultadoFactura } from './facturas'
 
 /** La carta para cargar pedidos (solo lo activo) */
 export function useCarta() {
@@ -94,6 +96,14 @@ export function CargarPedido({ mesa, onCerrar, onListo }: { mesa: Mesa; onCerrar
 export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: Pick<PedidoItem, 'cantidad' | 'nombre' | 'nota' | 'precio'>[]; onCerrar: () => void; onListo: () => void }) {
   const medios = useConsulta(() => tabla<MedioPago[]>(supabase.from('medios_pago').select('*').eq('activo', true).order('orden')))
   const destino = useConsulta(() => rpc<string>('jornada_caja'))
+  const fac = useConsulta(() => rpc<EstadoFacturacion | null>('facturacion_estado').catch(() => null))
+  const [conFactura, setConFactura] = useState<boolean | null>(null)
+  const [receptor, setReceptor] = useState<Receptor>({})
+  // Después de cobrar: el ticket y cómo salió la factura
+  const [cobrado, setCobrado] = useState<{ id: number; total: number } | null>(null)
+  const [factura, setFactura] = useState<Factura | null>(null)
+  const [errFactura, setErrFactura] = useState('')
+  const [facturando, setFacturando] = useState(false)
   const [medio, setMedio] = useState('')
   const [desc, setDesc] = useState('0')
   const [div, setDiv] = useState('1')
@@ -107,11 +117,26 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
   const d = Math.min(100, Math.max(0, Number(desc) || 0)), partes = Math.max(1, Math.floor(Number(div) || 1))
   const total = Math.round(sub * (1 - d / 100) * 100) / 100
   const elegido = medio || medios.datos?.[0]?.nombre || ''
+  const facturable = !!fac.datos?.activa
+  const facturar = facturable && (conFactura ?? fac.datos!.facturar_siempre)
+  const falta = facturar && total >= (fac.datos?.tope ?? Infinity) && !(receptor.doc_nro ?? '').replace(/\D/g, '')
+  async function pedirFactura(t: { id: number; total: number }) {
+    setFacturando(true); setErrFactura('')
+    try { setFactura(await facturarTicket(t.id, receptor)) } catch (e) { setErrFactura(e instanceof Error ? e.message : String(e)) } finally { setFacturando(false) }
+  }
+  if (cobrado) return <Modal titulo={`Mesa ${mesa.numero} cobrada · ${plata(cobrado.total)}`} onCerrar={onListo}
+    pie={<><span className="grow" /><button className="btn" onClick={onListo}>Listo</button></>}>
+    {facturando && !factura && !errFactura ? <p className="muted">Pidiendo la factura a ARCA…</p>
+      : <ResultadoFactura f={factura} error={errFactura} ocupado={facturando} onReintentar={() => pedirFactura(cobrado)} />}
+  </Modal>
   return <Modal titulo={`Cobrar mesa ${mesa.numero}`} onCerrar={onCerrar}
     pie={<><div className="grow"><div className="label">Total a cobrar</div><div className="mono" style={{ fontWeight: 600, fontSize: 22 }}>{plata(total)}</div></div>
-      <button className="btn pri" disabled={ocupado || !elegido} onClick={async () => {
-        if (await correr(() => rpc('cobrar_mesa', { p_mesa: mesa.id, p_medio: elegido, p_descuento: d }), `Cobrado ${plata(total)} · ${elegido}`)) onListo()
-      }}>Confirmar cobro</button></>}>
+      <button className="btn pri" disabled={ocupado || !elegido || falta} onClick={async () => {
+        let t: { id: number; total: number } | null = null
+        if (!(await correr(async () => { t = await rpc<{ id: number; total: number }>('cobrar_mesa', { p_mesa: mesa.id, p_medio: elegido, p_descuento: d }) }, `Cobrado ${plata(total)} · ${elegido}`))) return
+        if (!facturar || !t || Number((t as { total: number }).total) <= 0) { onListo(); return }
+        setCobrado(t); pedirFactura(t)
+      }}>{facturar ? 'Cobrar y facturar' : 'Confirmar cobro'}</button></>}>
     {destino.datos && destino.datos !== jornada() && <div className="notice">La caja de hoy ya está cerrada: este cobro va a la jornada del <b>{fecha(destino.datos)}</b>.</div>}
     <Items items={agrupados} />
     <div className="total-row" style={{ borderTopWidth: 1 }}><span className="label">Subtotal</span><span className="num" style={{ fontSize: 16 }}>{plata(sub)}</span></div>
@@ -123,6 +148,11 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
       <button key={m.nombre} className="opt" aria-pressed={m.nombre === elegido} onClick={() => setMedio(m.nombre)}>{m.nombre}</button>)}</div></div>
     {d > 0 && <div className="muted">Descuento: −{plata(sub - total)}</div>}
     {partes > 1 && <span className="pill acc" style={{ fontSize: 14, padding: '6px 12px', alignSelf: 'flex-start' }}>{plata(total / partes)} por persona</span>}
+    {facturable && <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+      <label className="fila" style={{ gap: 8, fontWeight: 600 }}><input id="c-factura" type="checkbox" checked={facturar} onChange={(e) => setConFactura(e.target.checked)} style={{ width: 20, height: 20 }} />
+        Hacer Factura C{fac.datos!.ambiente === 'homologacion' && <span className="pill">modo prueba</span>}</label>
+      {facturar && <CamposReceptor r={receptor} set={setReceptor} total={total} tope={fac.datos!.tope} />}
+    </div>}
   </Modal>
 }
 

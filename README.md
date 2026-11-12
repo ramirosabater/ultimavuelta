@@ -1,7 +1,7 @@
 # Última Vuelta · El bar de los Seba's
 
 App para manejar el bar y parrilla de Rada Tilly: mesas y comandas, carta por QR, reservas, caja, stock con recetas,
-compras con factura por foto o PDF, control semanal de pérdidas, administración y tableros. Con Chichito, el ayudante.
+compras con factura por foto o PDF, factura electrónica con ARCA, control semanal de pérdidas, administración y tableros. Con Chichito, el ayudante.
 
 Stack: **Supabase** (Postgres, usuarios, tiempo real, funciones) + **Netlify** (app React). Igual que Serco.
 
@@ -13,9 +13,11 @@ supabase/migrations/
   20261029000004_qr_y_ayudante.sql carta pública por QR, sugerencias y contexto de Chichito, permisos de funciones
   20261112000005_referencias.sql  tabla de referencia: limpieza, rinde de cocción y porción típica
   20261112000006_reservas.sql     reservas: página pública, cupo por horario, confirmar y sentar
+  20261112000007_facturacion.sql  factura electrónica con ARCA: datos del emisor, facturas, factura pública con su código
 supabase/functions/
   usuarios/                       invitar usuarios por mail (necesita la clave de servicio)
   ia/                             leer facturas (foto o PDF) y responder preguntas a Chichito con la API de Claude
+  arca/                           factura electrónica directa con ARCA (WSAA + WSFEv1): Factura C y Nota de crédito C
 puesta-en-marcha/                 SQL listo para pegar y la guía paso a paso (GUIA.md)
 pruebas/local/                    base Postgres local, prueba por roles y recorrido de punta a punta con Playwright
 web/                              la app (React 19 + Vite + TypeScript)
@@ -44,6 +46,13 @@ pedir, ver y cancelar la propia), con cupo por horario, una reserva por teléfon
   valores aproximados para arrancar) y se corrigen con las pruebas de rendimiento propias.
 - **Reservas**: cada horario tiene un cupo de personas (`reservas_cupo`); lo pendiente, confirmado y sentado lo ocupa.
   Las de la página entran por confirmar; las que carga el encargado, confirmadas. Las de madrugada son de la noche anterior.
+- **Facturación (ARCA)**: monotributo, así que siempre Factura C (código 11) y Nota de crédito C (13), con el total como neto
+  y sin IVA. La función `arca` firma el pedido de acceso (CMS) con la clave privada, guarda el ticket de acceso 12 horas
+  (ARCA no da otro mientras dure), pide el último número y el CAE. Si dos facturas piden el mismo número (error 10016)
+  reintenta; si se corta la conexión, la factura queda pendiente con el número intentado y al reintentar la consulta en ARCA
+  antes de pedir otra, así no hay duplicadas. La clave privada está en `facturacion_secreto`, que solo lee la función.
+  Consumidor final sin identificar hasta `tope_identificar` ($10.000.000, RG 5700); siempre se informa la condición
+  frente al IVA del receptor (RG 5616).
 - **Al cobrar** se descuentan del stock los artículos de cada plato y queda guardado el costo del ticket.
 - **Control semanal**: entre dos inventarios completos, `inicial + compras − final − uso según ventas − mermas registradas`
   = lo que falta sin explicación, en kilos y en plata.
@@ -55,7 +64,8 @@ pedir, ver y cancelar la propia), con cupo por horario, una reserva por teléfon
 Seguir [`puesta-en-marcha/GUIA.md`](puesta-en-marcha/GUIA.md). `1-base.sql` es la concatenación de las migraciones;
 si se cambia una migración, regenerarlo con `cat supabase/migrations/*.sql`.
 Las migraciones nuevas para una base que ya está andando van también en `puesta-en-marcha/actualizaciones/`,
-numeradas, para pegarlas una vez en el SQL Editor.
+numeradas, para pegarlas una vez en el SQL Editor. Las funciones en un solo archivo (`puesta-en-marcha/funciones/`)
+se regeneran con `python3 scripts/empaquetar-funciones.py`.
 
 ## Probar en la PC
 
@@ -69,6 +79,8 @@ Sin Supabase, con Postgres 16 y PostgREST locales (lo que se usó para probar):
 
 ```bash
 pruebas/local/armar-base.sh                       # base "bar": migraciones + carta de ejemplo + 5 usuarios de prueba
+pruebas/local/e2e/levantar-arca.sh                # ARCA simulado + la función arca con Deno (facturación sin salir de la PC)
+node pruebas/local/e2e/facturacion.mjs            # facturación de punta a punta: CSR, certificado, CAE, cortes, nota de crédito
 psql -d bar -f pruebas/local/flujo.sql            # una noche completa rol por rol, por SQL → "TODO BIEN"
 postgrest pruebas/local/e2e/postgrest.conf &      # API en :54330
 node pruebas/local/e2e/mock-ia.mjs &              # imita la función ia en :54331

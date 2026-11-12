@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { rpc, tabla, useConsulta, useEnVivo } from '../lib/datos'
-import { supabase } from '../lib/supabase'
+import { invocar, supabase } from '../lib/supabase'
 import { duracion, fecha, hhmm, jornada, minutosDesde, plata } from '../lib/formato'
-import type { Cuenta, Gasto, Jornada, MedioPago, Mesa, Pedido, Ticket } from '../lib/tipos'
+import type { Cuenta, Factura, Gasto, Jornada, MedioPago, Mesa, Pedido, Ticket } from '../lib/tipos'
+import type { EstadoFacturacion } from '../lib/factura'
+import { numeroFactura } from '../lib/factura'
+import { EstadoFacturaTicket, FacturarTicket } from '../components/facturas'
 import { Cobrar } from '../components/salon'
 import { AutoVacio } from '../components/Autos'
 import { Cabeza, Modal, Pill, Stat, useAccion } from '../components/ui'
 
-type Ventana = null | 'abrir' | 'gasto' | 'cerrar' | { cobrar: Mesa }
+type Ventana = null | 'abrir' | 'gasto' | 'cerrar' | { cobrar: Mesa } | { facturar: Ticket }
 
 export default function Caja() {
   const [ver, setVer] = useState<string | null>(null)
@@ -25,14 +28,21 @@ export default function Caja() {
       tabla<Cuenta[]>(supabase.from('cuentas').select('*')),
       rpc<number>('efectivo_esperado', { p_jornada: j }),
     ])
-    return { jor: jor[0] ?? null, tickets, gastos, mesas, pedidos, medios, cuentas, esperado: Number(esperado) }
+    const [facturas, fac] = await Promise.all([
+      tickets.length ? tabla<Factura[]>(supabase.from('facturas').select('*').in('ticket_id', tickets.map((t) => t.id))) : Promise.resolve([] as Factura[]),
+      rpc<EstadoFacturacion | null>('facturacion_estado').catch(() => null),
+    ])
+    return { jor: jor[0] ?? null, tickets, gastos, mesas, pedidos, medios, cuentas, esperado: Number(esperado), facturas, fac }
   }, [j])
-  useEnVivo(['mesas', 'pedidos'], recargar, 30)
+  useEnVivo(['mesas', 'pedidos', 'facturas'], recargar, 30)
+  const { correr } = useAccion()
   const [ventana, setVentana] = useState<Ventana>(null)
 
   if (error) return <div className="aviso bad">{error}</div>
   if (!datos) return <p className="cargando">Cargando la caja…</p>
-  const { jor, tickets, gastos, mesas, pedidos, medios, cuentas, esperado } = datos
+  const { jor, tickets, gastos, mesas, pedidos, medios, cuentas, esperado, facturas, fac } = datos
+  const factOn = !!fac?.activa
+  const facturasDe = (t: number) => facturas.filter((f) => f.ticket_id === t && f.ambiente === fac?.ambiente)
   const abierta = jor?.apertura != null, cerrada = !!jor?.cerrada_en
   const total = tickets.reduce((s, t) => s + Number(t.total), 0)
   const porMedio = medios.map((m) => ({ ...m, v: tickets.filter((t) => t.medio === m.nombre).reduce((s, t) => s + Number(t.total), 0) }))
@@ -43,8 +53,8 @@ export default function Caja() {
   const totalMesa = (m: Mesa) => itemsDe(m).reduce((s, i) => s + i.cantidad * i.precio, 0)
   const porCobrar = [...mesas].sort((a, b) => (a.estado === 'cuenta' ? 0 : 1) - (b.estado === 'cuenta' ? 0 : 1) || a.numero - b.numero)
   const movs = [
-    ...tickets.map((t) => ({ h: t.hora, txt: `Mesa ${t.mesa_numero ?? '—'} · ${(t.ticket_items ?? []).reduce((s, i) => s + i.cantidad, 0)} ítems`, med: t.medio + (Number(t.descuento_pct) ? ` · ${t.descuento_pct}% desc.` : ''), m: Number(t.total) })),
-    ...gastos.map((g) => ({ h: g.creado, txt: `Gasto: ${g.concepto}`, med: 'Efectivo', m: -Number(g.monto) })),
+    ...tickets.map((t) => ({ t, h: t.hora, txt: `Mesa ${t.mesa_numero ?? '—'} · ${(t.ticket_items ?? []).reduce((s, i) => s + i.cantidad, 0)} ítems`, med: t.medio + (Number(t.descuento_pct) ? ` · ${t.descuento_pct}% desc.` : ''), m: Number(t.total) })),
+    ...gastos.map((g) => ({ t: null as Ticket | null, h: g.creado, txt: `Gasto: ${g.concepto}`, med: 'Efectivo', m: -Number(g.monto) })),
   ].sort((a, b) => (a.h < b.h ? 1 : -1))
   const listo = () => { setVentana(null); recargar(); destino.recargar() }
   const jc = destino.datos
@@ -84,15 +94,20 @@ export default function Caja() {
     </div>
 
     <section className="panel" style={{ marginTop: 16 }}><h3 style={{ marginBottom: 6 }}>Movimientos de hoy</h3>
-      {movs.length ? <div className="tbl-wrap"><table><thead><tr><th>Hora</th><th>Detalle</th><th>Medio</th><th className="r">Importe</th></tr></thead><tbody>
-        {movs.map((x, i) => <tr key={i}><td className="mono">{hhmm(x.h)}</td><td>{x.txt}</td><td className="muted">{x.med}</td><td className="r mono" style={x.m < 0 ? { color: 'var(--crit)' } : undefined}>{plata(x.m)}</td></tr>)}
+      {movs.length ? <div className="tbl-wrap"><table><thead><tr><th>Hora</th><th>Detalle</th><th>Medio</th><th className="r">Importe</th>{factOn && <th>Factura</th>}</tr></thead><tbody>
+        {movs.map((x, i) => <tr key={i}><td className="mono">{hhmm(x.h)}</td><td>{x.txt}</td><td className="muted">{x.med}</td><td className="r mono" style={x.m < 0 ? { color: 'var(--crit)' } : undefined}>{plata(x.m)}</td>
+          {factOn && <td>{x.t && Number(x.t.total) > 0 && <EstadoFacturaTicket fs={facturasDe(x.t.id)} onFacturar={() => setVentana({ facturar: x.t! })}
+            onAnular={(f) => { if (window.confirm(`¿Anular la factura ${numeroFactura(f.punto_venta, f.numero)} de ${plata(f.total)}? Se hace una nota de crédito en ARCA y después la podés volver a facturar.`))
+              correr(async () => { const r = await invocar('arca', { accion: 'anular', factura_id: f.id }); if (r.error) throw new Error(r.error); recargar() }, 'Factura anulada con nota de crédito') }} />}</td>}</tr>)}
       </tbody></table></div> : <div className="kempty">Sin cobros todavía. Los tickets aparecen acá al cobrar una mesa.</div>}
     </section>
 
     {ventana === 'abrir' && <AbrirCaja onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana === 'gasto' && <GastoCaja onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana === 'cerrar' && <CerrarCaja esperado={esperado} jor={jor!} efectivo={efectivo} egresos={egresos} hayMesas={mesas.length > 0} onCerrar={() => setVentana(null)} onListo={listo} />}
-    {ventana && typeof ventana === 'object' && <Cobrar mesa={ventana.cobrar} items={itemsDe(ventana.cobrar)} onCerrar={() => setVentana(null)} onListo={listo} />}
+    {ventana && typeof ventana === 'object' && 'facturar' in ventana && <FacturarTicket ticket={ventana.facturar.id} total={Number(ventana.facturar.total)} tope={fac?.tope ?? 10000000}
+      onCerrar={() => setVentana(null)} onListo={recargar} />}
+    {ventana && typeof ventana === 'object' && 'cobrar' in ventana && <Cobrar mesa={ventana.cobrar} items={itemsDe(ventana.cobrar)} onCerrar={() => setVentana(null)} onListo={listo} />}
   </>
 }
 
