@@ -18,14 +18,17 @@ una de **Netlify** (gratis), el repo en GitHub y, para leer facturas y que Chich
 
 ## 2. Funciones (invitar usuarios, leer facturas, Chichito)
 
-Desde una PC con el repo y la [CLI de Supabase](https://supabase.com/docs/guides/cli):
+Todo desde la página de Supabase, sin instalar nada:
 
-```bash
-supabase login
-supabase link --project-ref <el-ref-del-proyecto>      # está en la URL: https://<ref>.supabase.co
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-... APP_URL=https://ultimavuelta.netlify.app
-supabase functions deploy usuarios ia
-```
+1. **Edge Functions → Deploy a new function → Via Editor**. Nombre: `usuarios`. Borrá el ejemplo, pegá todo
+   `puesta-en-marcha/funciones/usuarios.ts` y tocá **Deploy function**.
+2. Lo mismo con el nombre `ia` y el archivo `puesta-en-marcha/funciones/ia.ts`.
+3. **Edge Functions → Secrets → Add new secret**:
+   - `ANTHROPIC_API_KEY` = la clave de la API de Claude
+   - `APP_URL` = la dirección de Netlify, por ejemplo `https://ultimavuelta.netlify.app`
+
+(Con la [CLI de Supabase](https://supabase.com/docs/guides/cli) también se puede: `supabase functions deploy usuarios ia`
+y `supabase secrets set ...` desde la carpeta del repo.)
 
 - `ANTHROPIC_API_KEY`: se saca en <https://console.anthropic.com> → API Keys. Cargá un poco de crédito; una factura cuesta
   unos pocos centavos de dólar y una pregunta a Chichito menos.
