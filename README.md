@@ -14,6 +14,7 @@ supabase/migrations/
   20261112000005_referencias.sql  tabla de referencia: limpieza, rinde de cocción y porción típica
   20261112000006_reservas.sql     reservas: página pública, cupo por horario, confirmar y sentar
   20261112000007_facturacion.sql  factura electrónica con ARCA: datos del emisor, facturas, factura pública con su código
+  20261112000008_sin_factura.sql  cobrar sin factura: el ticket queda marcado y no cuenta como pendiente
 supabase/functions/
   usuarios/                       invitar usuarios por mail (necesita la clave de servicio)
   ia/                             leer facturas (foto o PDF) y responder preguntas a Chichito con la API de Claude
@@ -52,7 +53,7 @@ pedir, ver y cancelar la propia), con cupo por horario, una reserva por teléfon
   reintenta; si se corta la conexión, la factura queda pendiente con el número intentado y al reintentar la consulta en ARCA
   antes de pedir otra, así no hay duplicadas. La clave privada está en `facturacion_secreto`, que solo lee la función.
   Consumidor final sin identificar hasta `tope_identificar` ($10.000.000, RG 5700); siempre se informa la condición
-  frente al IVA del receptor (RG 5616).
+  frente al IVA del receptor (RG 5616). Un cobro se puede marcar "sin factura" (`tickets.sin_factura`): no cuenta como pendiente.
 - **Al cobrar** se descuentan del stock los artículos de cada plato y queda guardado el costo del ticket.
 - **Control semanal**: entre dos inventarios completos, `inicial + compras − final − uso según ventas − mermas registradas`
   = lo que falta sin explicación, en kilos y en plata.

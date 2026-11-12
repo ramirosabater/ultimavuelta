@@ -69,6 +69,8 @@ export default function Caja() {
       <Stat label="Vendido" valor={plata(total)} /><Stat label="Mesas cobradas" valor={tickets.length} />
       <Stat label="Efectivo" valor={plata(efectivo)} /><Stat label="Gastos de caja" valor={plata(egresos)} />
       <Stat label="Debería haber en caja" valor={abierta ? plata(esperado) : '—'} />
+      {factOn && (() => { const facturado = tickets.filter((t) => facturasDe(t.id).some((f) => f.tipo === 11 && f.estado === 'autorizada' && !f.anulada)).reduce((s, t) => s + Number(t.total), 0)
+        return <><Stat label="Facturado" valor={plata(facturado)} /><Stat label="Sin factura" valor={plata(total - facturado)} /></> })()}
     </div>
     {cerrada && jc && jc !== j && <div className="alert" style={{ marginBottom: 16 }}><Pill tono="warn">Caja cerrada</Pill>
       <span className="grow">Lo que se cobre ahora va a la jornada del <b>{fecha(jc)}</b>.</span>
@@ -96,7 +98,8 @@ export default function Caja() {
     <section className="panel" style={{ marginTop: 16 }}><h3 style={{ marginBottom: 6 }}>Movimientos de hoy</h3>
       {movs.length ? <div className="tbl-wrap"><table><thead><tr><th>Hora</th><th>Detalle</th><th>Medio</th><th className="r">Importe</th>{factOn && <th>Factura</th>}</tr></thead><tbody>
         {movs.map((x, i) => <tr key={i}><td className="mono">{hhmm(x.h)}</td><td>{x.txt}</td><td className="muted">{x.med}</td><td className="r mono" style={x.m < 0 ? { color: 'var(--crit)' } : undefined}>{plata(x.m)}</td>
-          {factOn && <td>{x.t && Number(x.t.total) > 0 && <EstadoFacturaTicket fs={facturasDe(x.t.id)} onFacturar={() => setVentana({ facturar: x.t! })}
+          {factOn && <td>{x.t && Number(x.t.total) > 0 && <EstadoFacturaTicket fs={facturasDe(x.t.id)} sinFactura={x.t.sin_factura} onFacturar={() => setVentana({ facturar: x.t! })}
+            onSinFactura={() => correr(async () => { await rpc('ticket_sin_factura', { p_ticket: x.t!.id, p_valor: true }); recargar() }, 'Marcada sin factura')}
             onAnular={(f) => { if (window.confirm(`¿Anular la factura ${numeroFactura(f.punto_venta, f.numero)} de ${plata(f.total)}? Se hace una nota de crédito en ARCA y después la podés volver a facturar.`))
               correr(async () => { const r = await invocar('arca', { accion: 'anular', factura_id: f.id }); if (r.error) throw new Error(r.error); recargar() }, 'Factura anulada con nota de crédito') }} />}</td>}</tr>)}
       </tbody></table></div> : <div className="kempty">Sin cobros todavía. Los tickets aparecen acá al cobrar una mesa.</div>}

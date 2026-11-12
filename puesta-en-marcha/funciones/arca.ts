@@ -382,7 +382,9 @@ async function facturar(p: Pedido, usuario: string) {
     if (error) throw new ErrorArca(/duplicate|unique/i.test(error.message) ? 'La factura de esta mesa ya se está haciendo. Esperá un momento.' : error.message)
     f = data as Factura
   }
-  return await autorizar(c, cred, f)
+  const hecha = await autorizar(c, cred, f)
+  await db.from('tickets').update({ sin_factura: false }).eq('id', t.id)   // si estaba marcada "sin factura", ya no
+  return hecha
 }
 
 async function anular(p: Pedido, usuario: string) {

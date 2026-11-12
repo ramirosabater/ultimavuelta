@@ -102,5 +102,17 @@ ok(r.status >= 400, 'nadie cambia una factura desde la app')
 const sug = await rest('admin', '/rpc/sugerencias_ayudante', { method: 'POST', body: JSON.stringify({ p_area: 'caja' }) })
 ok(sug.data.some((s) => s.tema === 'factura-prueba'), 'Chichito avisa que se factura en modo prueba')
 
+// 9. Ventas que no se facturan
+const t4 = tickets[3] ?? tickets[2]
+r = await rest('cocina', '/rpc/ticket_sin_factura', { method: 'POST', body: JSON.stringify({ p_ticket: t4.id }) }); ok(r.status >= 400, 'la parrilla no marca ventas sin factura')
+r = await rest('mozo', '/rpc/ticket_sin_factura', { method: 'POST', body: JSON.stringify({ p_ticket: t2.id, p_valor: true }) })
+ok(/ya tiene factura/.test(r.data?.message ?? ''), 'no se marca sin factura una mesa ya facturada')
+const f2 = (await rest('admin', `/facturas?ticket_id=eq.${t2.id}&tipo=eq.11&estado=eq.autorizada`)).data[0]
+await arca('encargado', { accion: 'anular', factura_id: f2.id })
+await rest('mozo', '/rpc/ticket_sin_factura', { method: 'POST', body: JSON.stringify({ p_ticket: t2.id, p_valor: true }) })
+ok((await rest('admin', `/tickets?id=eq.${t2.id}&select=sin_factura`)).data[0].sin_factura === true, 'el mozo marca una venta sin factura')
+r = await arca('admin', { accion: 'facturar', ticket_id: t2.id })
+ok((await rest('admin', `/tickets?id=eq.${t2.id}&select=sin_factura`)).data[0].sin_factura === false, 'si después se factura, deja de estar marcada')
+
 console.log(fallas ? `${fallas} FALLAS` : 'FACTURACIÓN SIN ERRORES')
 process.exit(fallas ? 1 : 0)

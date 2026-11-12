@@ -70,6 +70,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 |---|---|
 | `01-reservas.sql` | Reservas: página pública para clientes, cupo por horario, confirmar por WhatsApp y sentar en una mesa |
 | `02-facturacion.sql` | Factura electrónica con ARCA (después, publicar la función `arca`: ver abajo) |
+| `03-sin-factura.sql` | Cobrar sin factura: la venta queda marcada y no aparece como pendiente |
 
 ## Factura electrónica (ARCA)
 
@@ -87,6 +88,9 @@ Monotributo: la app hace **Factura C** al cobrar cada mesa, directo con ARCA, co
       crear el punto de venta real, cargarlo, pasar a **Real (producción)** y probar de nuevo.
 3. Si ARCA está caído al cobrar, la mesa se cobra igual y la factura queda **pendiente**: en **Caja**, columna Factura → Reintentar.
    Chichito avisa si quedan ventas sin factura. **Anular** hace la nota de crédito.
+4. Las ventas que no se facturan: al cobrar, destildar **Hacer Factura C** (botón **Cobrar sin factura**). Quedan marcadas
+   "Sin factura" en la Caja (se pueden facturar después) y no cuentan como pendientes. Si la mayoría no se factura, en
+   Facturación se destilda "Al cobrar, la factura viene tildada".
 
 ## Rutina recomendada
 

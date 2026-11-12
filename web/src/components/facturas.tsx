@@ -66,7 +66,9 @@ export function FacturarTicket({ ticket, total, tope, onCerrar, onListo }: { tic
 }
 
 /** Etiqueta de la factura de un ticket para las listas */
-export function EstadoFacturaTicket({ fs, onFacturar, onAnular }: { fs: Factura[]; onFacturar?: () => void; onAnular?: (f: Factura) => void }) {
+export function EstadoFacturaTicket({ fs, sinFactura, onFacturar, onAnular, onSinFactura }: {
+  fs: Factura[]; sinFactura?: boolean; onFacturar?: () => void; onAnular?: (f: Factura) => void; onSinFactura?: () => void
+}) {
   const viva = fs.find((f) => f.tipo === 11 && f.estado === 'autorizada' && !f.anulada)
   const pendiente = fs.find((f) => f.tipo === 11 && f.estado === 'pendiente')
   if (viva) return <span className="fila" style={{ gap: 4, flexWrap: 'nowrap' }}>
@@ -74,8 +76,12 @@ export function EstadoFacturaTicket({ fs, onFacturar, onAnular }: { fs: Factura[
     {viva.ambiente === 'homologacion' && <Pill>prueba</Pill>}
     {onAnular && <button className="btn sm ghost danger" title="Hacer nota de crédito" onClick={() => onAnular(viva)}>Anular</button>}
   </span>
+  if (sinFactura && !pendiente) return <span className="fila" style={{ gap: 4, flexWrap: 'nowrap' }}>
+    <Pill>Sin factura</Pill>{onFacturar && <button className="btn sm ghost" onClick={onFacturar}>Facturar</button>}
+  </span>
   return <span className="fila" style={{ gap: 4, flexWrap: 'nowrap' }}>
-    {pendiente ? <Pill tono="warn">Pendiente</Pill> : fs.some((f) => f.anulada) ? <Pill>Anulada</Pill> : <Pill tono="crit">Sin factura</Pill>}
+    {pendiente ? <Pill tono="warn">Pendiente</Pill> : fs.some((f) => f.anulada) ? <Pill>Anulada</Pill> : <Pill tono="crit">Falta factura</Pill>}
     {onFacturar && <button className="btn sm" onClick={onFacturar}>{pendiente ? 'Reintentar' : 'Facturar'}</button>}
+    {onSinFactura && !pendiente && <button className="btn sm ghost" title="Marcarla como venta sin factura" onClick={onSinFactura}>No facturar</button>}
   </span>
 }

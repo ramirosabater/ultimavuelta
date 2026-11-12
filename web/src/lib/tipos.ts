@@ -48,7 +48,7 @@ export interface Jornada {
 }
 export interface Ticket {
   id: number; jornada: string; hora: string; mesa_numero: number | null; comensales: number | null; mozo_nombre: string | null
-  subtotal: number; descuento_pct: number; total: number; medio: string; costo: number
+  subtotal: number; descuento_pct: number; total: number; medio: string; costo: number; sin_factura: boolean
   ticket_items?: { nombre: string; cantidad: number; precio: number }[]
 }
 export interface Gasto {

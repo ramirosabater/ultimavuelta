@@ -134,9 +134,10 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
       <button className="btn pri" disabled={ocupado || !elegido || falta} onClick={async () => {
         let t: { id: number; total: number } | null = null
         if (!(await correr(async () => { t = await rpc<{ id: number; total: number }>('cobrar_mesa', { p_mesa: mesa.id, p_medio: elegido, p_descuento: d }) }, `Cobrado ${plata(total)} · ${elegido}`))) return
+        if (facturable && !facturar && t) await rpc('ticket_sin_factura', { p_ticket: (t as { id: number }).id, p_valor: true }).catch(() => {})
         if (!facturar || !t || Number((t as { total: number }).total) <= 0) { onListo(); return }
         setCobrado(t); pedirFactura(t)
-      }}>{facturar ? 'Cobrar y facturar' : 'Confirmar cobro'}</button></>}>
+      }}>{facturar ? 'Cobrar y facturar' : facturable ? 'Cobrar sin factura' : 'Confirmar cobro'}</button></>}>
     {destino.datos && destino.datos !== jornada() && <div className="notice">La caja de hoy ya está cerrada: este cobro va a la jornada del <b>{fecha(destino.datos)}</b>.</div>}
     <Items items={agrupados} />
     <div className="total-row" style={{ borderTopWidth: 1 }}><span className="label">Subtotal</span><span className="num" style={{ fontSize: 16 }}>{plata(sub)}</span></div>
@@ -151,7 +152,8 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
     {facturable && <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
       <label className="fila" style={{ gap: 8, fontWeight: 600 }}><input id="c-factura" type="checkbox" checked={facturar} onChange={(e) => setConFactura(e.target.checked)} style={{ width: 20, height: 20 }} />
         Hacer Factura C{fac.datos!.ambiente === 'homologacion' && <span className="pill">modo prueba</span>}</label>
-      {facturar && <CamposReceptor r={receptor} set={setReceptor} total={total} tope={fac.datos!.tope} />}
+      {facturar ? <CamposReceptor r={receptor} set={setReceptor} total={total} tope={fac.datos!.tope} />
+        : <small className="muted">Esta venta se cobra sin factura. Si después hace falta, se factura desde la Caja.</small>}
     </div>}
   </Modal>
 }
