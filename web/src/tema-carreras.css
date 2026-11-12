@@ -1,0 +1,121 @@
+/* Última Vuelta · tema "de carrera"
+   Colores del logo (azul marino, dorado, turquesa del mar de Rada Tilly) + los de las banderas de la pista:
+   amarilla = ocupada / en curso · verde = listo / bien · roja = urgente · a cuadros = pidió la cuenta (última vuelta).
+   Va después de base-prototipo.css e index.css y solo pisa lo que cambia. */
+@import url('https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&display=swap');
+
+:root {
+  --bg: #efebe2; --surface: #fffdf8; --sunk: #e3e0d6; --line: #d3d0c4; --fg: #141b26; --muted: #5d6675;
+  --accent: #1f3a5f; --accent-fg: #fff; --accent-soft: #dde5ef; --gold: #c9a35a;
+  --ember: #f2b600; --ok: #17803f; --ok-soft: #d9efe0; --warn: #9a6a00; --warn-soft: #faefc8; --crit: #c8231e; --crit-soft: #f8dcda;
+  --hdr: #0f1a2b; --hdr-fg: #f1ead9; --mar: #3b8c93;
+  --f-display: "Saira Condensed", "Big Shoulders Display", "Archivo Narrow", Impact, sans-serif;
+  --cuadro: 8px;
+  --cuadros: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / calc(var(--cuadro) * 2) calc(var(--cuadro) * 2);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c121c; --surface: #141d2b; --sunk: #1b2638; --line: #2a374c; --fg: #eef1f5; --muted: #95a1b3;
+    --accent: #e0b65e; --accent-fg: #14100a; --accent-soft: #2f2a1d; --gold: #d6ad5f;
+    --ember: #ffc629; --ok: #58c983; --ok-soft: #15301f; --warn: #f0bf4a; --warn-soft: #352b12; --crit: #ff6b62; --crit-soft: #3a1b1a;
+    --hdr: #070c15; --hdr-fg: #f1ead9; --mar: #5fb3ba;
+  }
+}
+
+/* Títulos con inclinación de velocidad */
+h1, h2, h3, .brand, .mesa .n, .ticket .th b, .pub-mesa { font-style: italic; }
+h1, h2, h3 { letter-spacing: .005em; }
+
+/* Encabezado: asfalto azul con líneas de velocidad y bandera a cuadros abajo */
+header {
+  background:
+    repeating-linear-gradient(115deg, transparent 0 46px, rgb(255 255 255 / .025) 46px 48px),
+    linear-gradient(100deg, var(--hdr) 55%, color-mix(in srgb, var(--accent) 35%, var(--hdr)));
+}
+@media (prefers-color-scheme: dark) { header { background: repeating-linear-gradient(115deg, transparent 0 46px, rgb(255 255 255 / .025) 46px 48px), linear-gradient(100deg, var(--hdr) 55%, #16243a); } }
+.vitral { height: calc(var(--cuadro) * 2); border: 0; opacity: 1; background: var(--cuadros); }
+.brand { font-size: 26px; }
+.brand small { color: var(--gold); }
+.brand-logo { box-shadow: 0 0 0 2px var(--gold), 0 0 0 4px var(--hdr); }
+nav a.active, nav .dt.active, nav a[aria-current="page"] { border-bottom-color: var(--ember); }
+nav a.active::after, nav .dt.active::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -3px; height: 3px; background: linear-gradient(90deg, var(--ember) 0 60%, transparent 60% 66%, var(--ember) 66% 78%, transparent 78% 84%, var(--ember) 84%); }
+nav a.active, nav .dt.active { border-bottom-color: transparent; }
+
+/* Botón principal con franja de carrera */
+.btn.pri { position: relative; overflow: hidden; letter-spacing: .01em; }
+.btn.pri::after { content: ""; position: absolute; top: 0; bottom: 0; right: 10px; width: 14px; background: linear-gradient(90deg, rgb(255 255 255 / .22) 0 4px, transparent 4px 7px, rgb(255 255 255 / .22) 7px 11px, transparent 11px); transform: skewX(-20deg); pointer-events: none; }
+.btn.pri { padding-right: 34px; }
+.btn.pri.sm { padding-right: 28px; }
+
+/* Mesas: el número va en el círculo blanco, como los autos del logo */
+.mesa { border-top-width: 6px; }
+.mesa .n {
+  align-self: flex-start; min-width: 54px; padding: 3px 12px 1px; text-align: center;
+  background: #fff; color: #111; border: 3px solid #111; border-radius: 999px; font-size: 28px;
+}
+.mesa.libre .n { opacity: .9; }
+.mesa.ocupada { border-top-color: var(--ember); }
+.mesa.cuenta { border-top-color: transparent; background: var(--surface); }
+.mesa.cuenta::before { content: ""; position: absolute; left: -1px; right: -1px; top: -6px; height: 6px; border-radius: var(--r) var(--r) 0 0; background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 6px 6px; }
+.mesa.cuenta .s { color: var(--fg); }
+.legend .lc::before { background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 5px 5px; }
+.side h2 { display: inline-block; background: #fff; color: #111; border: 3px solid #111; border-radius: 999px; padding: 0 16px; font-size: 32px; }
+
+/* Comandas: tablero de boxes */
+.kcol > h3 { border-bottom: 0; padding-bottom: 10px; background: linear-gradient(var(--fg), var(--fg)) bottom / 100% 2px no-repeat; }
+.ticket .th b { display: inline-block; min-width: 44px; text-align: center; background: #fff; color: #111; border: 2px solid #111; border-radius: 999px; padding: 0 10px; font-size: 22px; }
+
+/* Totales y tablas */
+.total-row { border-top: 0; padding-top: 14px; background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) top left / 6px 6px repeat-x; }
+.hbar .bar i { background: linear-gradient(90deg, var(--accent), var(--mar)); }
+
+/* Ingreso: largada */
+.ingreso {
+  background-color: var(--hdr);
+  background-image:
+    repeating-conic-gradient(#111 0 25%, #f1ead9 0 50%),
+    repeating-conic-gradient(#111 0 25%, #f1ead9 0 50%),
+    repeating-linear-gradient(115deg, transparent 0 60px, rgb(255 255 255 / .03) 60px 63px),
+    linear-gradient(160deg, #0f1a2b, #1d3352);
+  background-size: 16px 16px, 16px 16px, auto, auto;
+  background-position: top left, bottom left, 0 0, 0 0;
+  background-repeat: repeat-x, repeat-x, repeat, no-repeat;
+  align-content: center; gap: 26px;
+}
+.ingreso .card { border-top: 0; position: relative; overflow: hidden; padding-top: 34px; }
+.ingreso .card::before { content: ""; position: absolute; inset: 0 0 auto; height: 12px; background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
+.ingreso h1 { font-size: 34px; }
+.categorias { width: min(560px, 100%); text-align: center; color: var(--hdr-fg); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; opacity: .75; line-height: 1.9; }
+.categorias span { white-space: nowrap; }
+.categorias span + span::before { content: "·"; margin: 0 8px; color: var(--gold); }
+
+/* Carta pública por QR */
+.pub-cab { border-bottom: 0; position: relative; padding-bottom: 18px; }
+.pub-cab::after { content: ""; position: absolute; left: 0; right: 0; bottom: 4px; height: 8px; background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 8px 8px; border-radius: 2px; }
+.pub-mesa { background: #fff; color: #111; border: 3px solid #111; border-radius: 999px; }
+.pub-sec h2 { color: var(--accent); }
+.pub-ped.preparando { border-left-color: var(--ember); }
+
+/* Chichito y recorridos */
+#ch-ring { border-color: var(--ember); }
+
+/* Autos de carrera (components/Autos.tsx) */
+.auto { display: block; width: 100%; height: auto; overflow: visible; }
+.grilla { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; width: min(760px, 100%); margin: 0; }
+.grilla figure { margin: 0; width: clamp(96px, 17%, 140px); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.grilla figcaption { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; text-align: center; line-height: 1.25; }
+.ingreso .grilla { width: min(900px, 100%); }
+.ingreso .grilla figure { width: clamp(120px, 18%, 170px); }
+.ingreso .grilla figcaption { color: var(--hdr-fg); opacity: .85; font-size: 11.5px; }
+.pub-fin { margin: 28px 0 0; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pub-fin .grilla figcaption { color: var(--muted); }
+.vacio-auto { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.vacio-auto .auto { width: 120px; opacity: .55; filter: grayscale(.3); }
+.calentando { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--hdr-fg); }
+.calentando .auto { width: 200px; }
+.calentando p { margin: 0; font: italic 700 18px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+@media (prefers-reduced-motion: no-preference) {
+  .calentando .auto { animation: motor .12s ease-in-out infinite alternate; }
+  @keyframes motor { to { transform: translate(1px, -1.5px); } }
+  .grilla figure:hover .auto { transform: translateX(6px); transition: transform .25s ease-out; }
+}
