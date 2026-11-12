@@ -1,6 +1,6 @@
 # Última Vuelta · El bar de los Seba's
 
-App para manejar el bar y parrilla de Rada Tilly: mesas y comandas, carta por QR, caja, stock con recetas,
+App para manejar el bar y parrilla de Rada Tilly: mesas y comandas, carta por QR, reservas, caja, stock con recetas,
 compras con factura por foto o PDF, control semanal de pérdidas, administración y tableros. Con Chichito, el ayudante.
 
 Stack: **Supabase** (Postgres, usuarios, tiempo real, funciones) + **Netlify** (app React). Igual que Serco.
@@ -12,6 +12,7 @@ supabase/migrations/
   20261029000003_tableros.sql     tableros con filtros, previsión de compras y control de inventario
   20261029000004_qr_y_ayudante.sql carta pública por QR, sugerencias y contexto de Chichito, permisos de funciones
   20261112000005_referencias.sql  tabla de referencia: limpieza, rinde de cocción y porción típica
+  20261112000006_reservas.sql     reservas: página pública, cupo por horario, confirmar y sentar
 supabase/functions/
   usuarios/                       invitar usuarios por mail (necesita la clave de servicio)
   ia/                             leer facturas (foto o PDF) y responder preguntas a Chichito con la API de Claude
@@ -26,12 +27,13 @@ web/                              la app (React 19 + Vite + TypeScript)
 |---|---|
 | Dueño (`admin`) | Todo, incluidos usuarios y configuración |
 | Encargado | Todo menos usuarios y configuración |
-| Mozo | Mesas: abrir, cargar pedidos, confirmar los del QR, cobrar |
+| Mozo | Mesas: abrir, cargar pedidos, confirmar los del QR, cobrar. Reservas: verlas y sentarlas |
 | Parrilla (`cocina`) / Barra | Su pantalla de comandas |
-| Cliente (sin usuario) | La carta de su mesa por QR: pedir y llamar al mozo |
+| Cliente (sin usuario) | La carta de su mesa por QR: pedir y llamar al mozo. `/reservar`: pedir una reserva y verla o cancelarla con su link |
 
 Los permisos están en la base (RLS + funciones `security definer`), no solo en la pantalla: un mozo no puede leer costos
-ni tickets aunque lo intente desde afuera de la app, y el QR solo puede usar tres funciones con el código de su mesa.
+ni tickets aunque lo intente desde afuera de la app, y el QR solo puede usar tres funciones con el código de su mesa. La página de reservas usa otras cinco (ver horarios,
+pedir, ver y cancelar la propia), con cupo por horario, una reserva por teléfono y noche, y freno a pedidos en masa.
 
 ## Cómo calcula
 
@@ -40,6 +42,8 @@ ni tickets aunque lo intente desde afuera de la app, y el QR solo puede usar tre
   (cocido: 0,30 kg de vacío) o "limpio crudo" (60 ml de gin). A comprar = cantidad ÷ rinde de cocción (si es al plato)
   ÷ (1 − merma de limpieza). Merma y rinde salen de la **tabla de referencia** (83 artículos de cocina y barra,
   valores aproximados para arrancar) y se corrigen con las pruebas de rendimiento propias.
+- **Reservas**: cada horario tiene un cupo de personas (`reservas_cupo`); lo pendiente, confirmado y sentado lo ocupa.
+  Las de la página entran por confirmar; las que carga el encargado, confirmadas. Las de madrugada son de la noche anterior.
 - **Al cobrar** se descuentan del stock los artículos de cada plato y queda guardado el costo del ticket.
 - **Control semanal**: entre dos inventarios completos, `inicial + compras − final − uso según ventas − mermas registradas`
   = lo que falta sin explicación, en kilos y en plata.
@@ -48,8 +52,10 @@ ni tickets aunque lo intente desde afuera de la app, y el QR solo puede usar tre
 
 ## Puesta en marcha
 
-Seguir [`puesta-en-marcha/GUIA.md`](puesta-en-marcha/GUIA.md). `1-base.sql` es la concatenación de las 4 migraciones;
+Seguir [`puesta-en-marcha/GUIA.md`](puesta-en-marcha/GUIA.md). `1-base.sql` es la concatenación de las migraciones;
 si se cambia una migración, regenerarlo con `cat supabase/migrations/*.sql`.
+Las migraciones nuevas para una base que ya está andando van también en `puesta-en-marcha/actualizaciones/`,
+numeradas, para pegarlas una vez en el SQL Editor.
 
 ## Probar en la PC
 

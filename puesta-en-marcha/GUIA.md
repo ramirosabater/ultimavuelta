@@ -57,6 +57,18 @@ y `supabase secrets set ...` desde la carpeta del repo.)
 5. **Carta y QR → Carta**: productos y precios. **Stock → Recetas**: cuánto lleva cada plato (así sale el costo).
 6. **Carta y QR → Mesas y QR**: ajustá las mesas e **imprimí los QR**.
 7. **Administración → Usuarios**: invitá a los mozos, la parrilla y la barra. A cada uno le llega un mail para elegir su contraseña.
+8. **Administración → Configuración → Reservas**: horarios, lugares por horario, máximo de personas y el WhatsApp del local.
+   Después, en **Reservas → Link y QR para clientes**, copiá el link (`/reservar`) para Instagram y WhatsApp o bajá el QR para la puerta.
+
+## Actualizaciones
+
+Cuando la app suma algo que necesita cambios en la base, viene un archivo en `puesta-en-marcha/actualizaciones/`.
+Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La app en Netlify se actualiza sola.
+(Una base nueva no los necesita: `1-base.sql` ya los trae.)
+
+| Archivo | Qué agrega |
+|---|---|
+| `01-reservas.sql` | Reservas: página pública para clientes, cupo por horario, confirmar por WhatsApp y sentar en una mesa |
 
 ## Rutina recomendada
 
@@ -69,6 +81,7 @@ y `supabase secrets set ...` desde la carpeta del repo.)
 | Cuando llega carne | Prueba de rendimiento: pesar crudo y limpio | Stock → Rendimientos |
 | Una vez por semana, al cierre | Inventario completo | Stock → Control semanal |
 | Una vez por semana | Mirar Costos y desperdicio | Tableros |
+| Cada tarde | Confirmar las reservas que entraron por la página | Reservas |
 
 ## Si algo falla
 

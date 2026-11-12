@@ -6,8 +6,9 @@ const OUT = process.env.OUT || '/tmp/capturas'; mkdirSync(OUT, { recursive: true
 const RUTAS = {
   5173: ['/tableros/resumen', '/tableros/ventas', '/tableros/costos', '/tableros/finanzas', '/mesas', '/cocina', '/barra', '/caja',
     '/stock/articulos', '/stock/recetas', '/stock/rendimientos', '/stock/compras', '/stock/control', '/stock/mermas',
-    '/admin/proveedores', '/admin/gastos', '/admin/cuentas', '/admin/usuarios', '/admin/configuracion', '/carta', '/carta/mesas'],
-  5174: ['/mesas', '/caja>/mesas', '/tableros/resumen>/mesas'], 5175: ['/cocina', '/barra>/cocina', '/mesas>/cocina'],
+    '/admin/proveedores', '/admin/gastos', '/admin/cuentas', '/admin/usuarios', '/admin/configuracion', '/carta', '/carta/mesas', '/reservas'],
+  5174: ['/mesas', '/reservas', '/caja>/mesas', '/tableros/resumen>/mesas'], 5175: ['/cocina', '/barra>/cocina', '/mesas>/cocina', '/reservas>/cocina'],
+  5176: ['/reservar'],
 }
 const b = await chromium.launch()
 let problemas = 0

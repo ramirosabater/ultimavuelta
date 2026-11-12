@@ -34,7 +34,7 @@ export default function Layout() {
   const gestion = GESTION.includes(rol)
   const { pathname } = useLocation()
   const [abierto, setAbierto] = useState<string | null>(null)
-  const [n, setN] = useState({ salon: 0, cocina: 0, barra: 0, stock: 0, vencidos: 0 })
+  const [n, setN] = useState({ salon: 0, cocina: 0, barra: 0, stock: 0, vencidos: 0, reservas: 0 })
   const nav = useRef<HTMLElement>(null)
 
   // Los números del menú: lo que espera que alguien haga algo
@@ -47,8 +47,9 @@ export default function Layout() {
       cuenta(supabase.from('pedidos').select('id', { count: 'exact', head: true }).is('ticket_id', null).eq('confirmado', true).in('est_cocina', ['pendiente', 'preparando'])),
       cuenta(supabase.from('pedidos').select('id', { count: 'exact', head: true }).is('ticket_id', null).eq('confirmado', true).in('est_barra', ['pendiente', 'preparando'])),
     ])
-    let stock = 0, vencidos = 0
+    let stock = 0, vencidos = 0, reservas = 0
     if (gestion) {
+      reservas = await cuenta(supabase.from('reservas').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').gte('fecha', jornada()))
       const [a, b, c] = await Promise.all([
         supabase.from('insumos').select('cantidad, minimo').eq('activo', true).gt('minimo', 0),
         cuenta(supabase.from('insumos').select('id', { count: 'exact', head: true }).eq('activo', true).gt('cantidad', 0).lte('vence', sumarDias(hoy(), 2))),
@@ -57,10 +58,10 @@ export default function Layout() {
       stock = (a.data ?? []).filter((i) => Number(i.cantidad) <= Number(i.minimo)).length + b
       vencidos = c
     }
-    setN({ salon: llamados + qr + listos, cocina, barra, stock, vencidos })
+    setN({ salon: llamados + qr + listos, cocina, barra, stock, vencidos, reservas })
   }, [gestion])
   useEffect(() => { contar() }, [contar, pathname])
-  useEnVivo(['pedidos', 'llamados'], contar, 30)
+  useEnVivo(['pedidos', 'llamados', 'reservas'], contar, 30)
 
   useEffect(() => { setAbierto(null) }, [pathname])
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function Layout() {
 
   const grupos: Grupo[] = [
     { t: 'Mesas', to: '/mesas', n: n.salon, roles: ['admin', 'encargado', 'mozo'] },
+    { t: 'Reservas', to: '/reservas', n: n.reservas, roles: ['admin', 'encargado', 'mozo'] },
     { t: 'Parrilla', to: '/cocina', n: n.cocina, roles: ['admin', 'encargado', 'cocina'] },
     { t: 'Barra', to: '/barra', n: n.barra, roles: ['admin', 'encargado', 'barra'] },
     { t: 'Caja', to: '/caja', roles: GESTION },

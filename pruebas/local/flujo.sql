@@ -155,5 +155,52 @@ select '   sugerencia de lo medido: ' || coalesce((select s->>'texto' from suger
 do $$ begin
   if not exists (select 1 from sugerencias_ayudante('stock') s where s->>'tema' = 'rendimiento-medido') then raise exception 'Chichito no avisó del rendimiento medido'; end if;
 end $$;
+\echo '10. Reservas: la página pública, el cupo y sentar'
+select jornada_actual() + 2 as f, jornada_actual() + 90 as lejos \gset
+select set_config('prueba.f', :'f', false) is not null as listo \gset
+select pg_temp.como('anon');
+select '   info: ' || (reservas_info() - 'cerrado' - 'hoy')::text;
+select '   horarios: ' || (select string_agg((x->>'hora') || '=' || (x->>'libres'), ' ') from jsonb_array_elements(reservas_disponibles((:'f')::date)) x);
+select pedir_reserva('Martina', '297 412-3456', 4, (:'f')::date, '21:00', 'Cumpleaños') as cod1 \gset
+select '   reserva hecha, código ' || :'cod1' || ': ' || (ver_reserva(:'cod1') ->> 'estado');
+select pg_temp.debe_fallar($q$select count(*) from reservas$q$, 'permission denied');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Martina'', ''2974123456'', 2, %L, ''22:00'')', :'f'), 'Ya tenés una reserva');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Pedro'', ''123'', 2, %L, ''22:00'')', :'f'), 'Revisá el teléfono');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Pedro'', ''2974000001'', 2, %L, ''21:15'')', :'f'), 'Elegí uno de los horarios');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Pedro'', ''2974000001'', 14, %L, ''21:00'')', :'f'), 'Para más de 10');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Pedro'', ''2974000001'', 2, %L, ''21:00'')', :'lejos'), 'Elegí otra fecha');
+select pedir_reserva('Grupo A', '2974000002', 10, (:'f')::date, '21:00');
+select pedir_reserva('Grupo B', '2974000003', 10, (:'f')::date, '21:00');
+select pg_temp.debe_fallar(format('select pedir_reserva(''Grupo C'', ''2974000004'', 10, %L, ''21:00'')', :'f'), 'No quedan lugares');
+select pedir_reserva('Grupo C', '2974000004', 6, (:'f')::date, '21:00') as cod2 \gset
+do $$ begin
+  if (select (x->>'libres')::int from jsonb_array_elements(reservas_disponibles(current_setting('prueba.f')::date)) x where x->>'hora' = '21:00') <> 0 then raise exception 'El cupo de las 21 tenía que estar lleno'; end if;
+end $$;
+select cancelar_reserva(:'cod2');
+select '   el cliente canceló: ' || (ver_reserva(:'cod2') ->> 'estado') || ', quedan ' ||
+  (select x->>'libres' from jsonb_array_elements(reservas_disponibles((:'f')::date)) x where x->>'hora' = '21:00') || ' lugares a las 21';
+select pg_temp.debe_fallar(format('select cancelar_reserva(%L)', :'cod2'), 'ya no se puede cancelar');
+select pg_temp.como(:'ADMIN');
+select '   sugerencias del dueño: ' || string_agg(s->>'tema', ', ') from sugerencias_ayudante('tablero') s;
+do $$ begin
+  if not exists (select 1 from sugerencias_ayudante() s where s->>'tema' = 'reservas-pendientes') then raise exception 'Chichito no avisó de las reservas por confirmar'; end if;
+end $$;
+update reservas set estado = 'confirmada', atendido = now() where codigo = :'cod1';
+-- Una reserva por teléfono que llega en 20 minutos
+insert into reservas (nombre, telefono, personas, fecha, hora, origen, estado, creado_por)
+values ('Rodríguez', '2974555555', 3, jornada_actual(), ((now() + interval '20 minutes') at time zone zona())::time(0), 'telefono', 'confirmada', :'ADMIN') returning id as res \gset
+select pg_temp.como(:'MOZO');
+select '   el mozo ve ' || count(*) || ' reservas' from reservas;
+select '   aviso al mozo: ' || coalesce((select s->>'texto' from sugerencias_ayudante('mesas') s where s->>'tema' = 'reserva-llega'), 'NO APARECIÓ');
+do $$ begin
+  if not exists (select 1 from sugerencias_ayudante('mesas') s where s->>'tema' = 'reserva-llega') then raise exception 'Chichito no avisó al mozo de la reserva'; end if;
+end $$;
+update reservas set estado = 'cancelada' where id = :res;   -- el mozo no puede cambiarlas: no pasa nada
+select (select id from mesas where estado = 'libre' order by numero limit 1) as mesa_libre \gset
+select sentar_reserva(:res, :mesa_libre);
+select format('   sentada en la mesa %s: %s comensales, reserva %s', m.numero, m.comensales, r.estado) from reservas r join mesas m on m.id = r.mesa_id where r.id = :res;
+select pg_temp.debe_fallar(format('select sentar_reserva(%s, %s)', :res, :mesa_libre), 'ya fue sentada');
+select pg_temp.como(:'ADMIN');
+select '   contexto con reservas: ' || (contexto_ayudante() like '%Reservas de hoy: %Rodríguez%');
 reset role;
 \echo 'TODO BIEN'

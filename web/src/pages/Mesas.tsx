@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { rpc, tabla, useConsulta, useEnVivo } from '../lib/datos'
 import { supabase } from '../lib/supabase'
-import { duracion, hhmm, minutosDesde, plata } from '../lib/formato'
-import type { Llamado, Mesa, Pedido } from '../lib/tipos'
+import { duracion, hhmm, jornada, minutosDesde, plata } from '../lib/formato'
+import type { Llamado, Mesa, Pedido, Reserva } from '../lib/tipos'
+import { hora } from '../lib/reservas'
+import { Sentar, momentoReserva } from '../components/reservas'
 import { AbrirMesa, CargarPedido, Cobrar, Items, MoverMesa } from '../components/salon'
 import { Cabeza, Pill, useAccion } from '../components/ui'
 
@@ -15,24 +18,31 @@ type Ventana = null | { tipo: 'abrir' | 'pedido' | 'cobrar' | 'mover'; mesa: Mes
 export default function Mesas() {
   const { gestion } = useAuth()
   const { datos, recargar, error } = useConsulta(async () => {
-    const [mesas, pedidos, llamados] = await Promise.all([
+    const [mesas, pedidos, llamados, reservas] = await Promise.all([
       tabla<Mesa[]>(supabase.from('mesas').select('*').eq('activa', true).order('numero')),
       tabla<Pedido[]>(supabase.from('pedidos').select('*, pedido_items(*)').is('ticket_id', null).order('creado')),
       tabla<Llamado[]>(supabase.from('llamados').select('*').order('creado')),
+      tabla<Reserva[]>(supabase.from('reservas').select('*').eq('fecha', jornada()).in('estado', ['pendiente', 'confirmada']).order('hora')),
     ])
     const nombres = new Map<string, string>()
     if (gestion) for (const p of await tabla<{ id: string; nombre: string }[]>(supabase.from('perfiles').select('id, nombre'))) nombres.set(p.id, p.nombre)
-    return { mesas, pedidos, llamados, nombres }
+    return { mesas, pedidos, llamados, nombres, reservas }
   })
-  useEnVivo(['mesas', 'pedidos', 'pedido_items', 'llamados'], recargar, 15)
+  useEnVivo(['mesas', 'pedidos', 'pedido_items', 'llamados', 'reservas'], recargar, 15)
   const [sel, setSel] = useState<number | null>(null)
   const [ventana, setVentana] = useState<Ventana>(null)
+  const [sentar, setSentar] = useState<Reserva | null>(null)
   const { correr, ocupado } = useAccion()
   const accion = useCallback(async (fn: () => Promise<unknown>, ok: string) => { if (await correr(fn, ok)) recargar() }, [correr, recargar])
 
   if (error) return <div className="aviso bad">{error}</div>
   if (!datos) return <p className="cargando">Cargando el salón…</p>
-  const { mesas, pedidos, llamados, nombres } = datos
+  const { mesas, pedidos, llamados, nombres, reservas } = datos
+  // Reservas de esta noche que todavía no llegaron (las muy atrasadas, más de 1 h, no se muestran acá)
+  const porLlegar = reservas.filter((r) => momentoReserva(r).getTime() > Date.now() - 60 * 60000)
+  const proxima = porLlegar[0]
+  // Una mesa asignada a una reserva se ve "reservada" desde 2 horas antes
+  const reservaDe = (m: Mesa) => porLlegar.find((r) => r.mesa_id === m.id && momentoReserva(r).getTime() < Date.now() + 120 * 60000)
   const mesaDe = (id: number) => mesas.find((m) => m.id === id)
   const deMesa = (id: number) => pedidos.filter((p) => p.mesa_id === id)
   const totalMesa = (id: number) => deMesa(id).filter((p) => p.confirmado).flatMap((p) => p.pedido_items ?? []).reduce((s, i) => s + i.cantidad * i.precio, 0)
@@ -63,6 +73,13 @@ export default function Mesas() {
       </div>)}
     </div>}
 
+    {porLlegar.length > 0 && <div className="res-hoy" data-ayuda="reservas-hoy">
+      <span className="grow"><b>Reservas de hoy:</b> {porLlegar.length} · {porLlegar.reduce((s, r) => s + r.personas, 0)} personas.
+        {proxima && <> Próxima: <b>{proxima.nombre}</b> ({proxima.personas}) a las <b className="mono">{hora(proxima.hora)}</b>{proxima.estado === 'pendiente' && ' · sin confirmar'}</>}</span>
+      {proxima && <button className="btn sm pri" onClick={() => setSentar(proxima)}>Llegaron: sentar</button>}
+      <Link className="btn sm ghost" to="/reservas">Ver todas</Link>
+    </div>}
+
     {!mesas.length && <div className="notice"><b>No hay mesas cargadas.</b><br />Un dueño o el encargado las crea en Carta y QR → Mesas y QR.</div>}
 
     <div className={`mesas-layout${mesa ? ' has-sel' : ''}`}>
@@ -73,7 +90,8 @@ export default function Mesas() {
           const hayListo = ps.some((p) => p.confirmado && (p.est_cocina === 'listo' || p.est_barra === 'listo'))
           return <button key={m.id} className={`mesa ${m.estado}${sel === m.id ? ' sel' : ''}`} onClick={() => setSel(sel === m.id ? null : m.id)} aria-label={`Mesa ${m.numero}`}>
             <span className="n">{m.numero}</span>
-            <span className="s">{m.estado === 'libre' ? (ps.length ? 'Pedido sin abrir' : 'Libre') : m.estado === 'cuenta' ? 'Pidió la cuenta' : `Ocupada · ${duracion(minutosDesde(m.abierta!))}`}</span>
+            <span className="s">{m.estado === 'libre' ? (ps.length ? 'Pedido sin abrir' : reservaDe(m) ? 'Reservada' : 'Libre') : m.estado === 'cuenta' ? 'Pidió la cuenta' : `Ocupada · ${duracion(minutosDesde(m.abierta!))}`}</span>
+            {m.estado === 'libre' && reservaDe(m) && <span className="res">{hora(reservaDe(m)!.hora)} · {reservaDe(m)!.nombre} ({reservaDe(m)!.personas})</span>}
             {(m.estado !== 'libre' || ps.length > 0) && <span className="t">{plata(tot)}</span>}
             <span className="badges">{llama && <Pill tono="crit">Llama</Pill>}{hayQr && <Pill tono="warn">QR</Pill>}{hayListo && <Pill tono="ok">Listo</Pill>}</span>
           </button>
@@ -125,6 +143,7 @@ export default function Mesas() {
     {ventana?.tipo === 'pedido' && <CargarPedido mesa={ventana.mesa} onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana?.tipo === 'cobrar' && <Cobrar mesa={ventana.mesa} items={deMesa(ventana.mesa.id).filter((p) => p.confirmado).flatMap((p) => p.pedido_items ?? [])}
       onCerrar={() => setVentana(null)} onListo={() => { setSel(null); listo() }} />}
+    {sentar && <Sentar r={sentar} mesas={mesas} onCerrar={() => setSentar(null)} onListo={() => { setSentar(null); recargar() }} />}
     {ventana?.tipo === 'mover' && <MoverMesa mesa={ventana.mesa} mesas={mesas} onCerrar={() => setVentana(null)} onListo={() => { setSel(null); listo() }} />}
   </>
 }

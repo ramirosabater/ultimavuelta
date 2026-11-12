@@ -21,6 +21,12 @@ export const CIRCUITOS: Circuito[] = [
     { ir: '/mesas', foco: 'panel-mesa', titulo: 'Cargá el pedido', texto: 'Tocá los productos, agregá aclaraciones si hace falta y mandá. La parrilla y la barra lo reciben al instante.' },
     { ir: '/mesas', foco: 'avisos', titulo: 'Los avisos', texto: 'Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar.' },
   ] },
+  { id: 'reservas', titulo: 'Tomar y confirmar reservas', area: 'reservas', roles: G, pasos: [
+    { ir: '/reservas', foco: 'link-reservas', titulo: 'El link para clientes', texto: 'Compartí este link en Instagram y WhatsApp, o imprimí el QR. El cliente elige día, horario y cuántos son, y te llega acá.' },
+    { ir: '/reservas', foco: 'nueva-reserva', titulo: 'Las que te piden por teléfono', texto: 'Si te reservan por teléfono o en el local, cargalas acá: entran confirmadas.' },
+    { ir: '/reservas', foco: 'dias-reserva', titulo: 'Cada noche', texto: 'Elegí el día y ves las reservas por horario, con cuántos lugares quedan. Las de la página entran por confirmar: tocás Confirmar y se abre WhatsApp con el mensaje listo.' },
+    { ir: '/mesas', foco: 'mesas', titulo: 'Cuando llegan', texto: 'En Mesas aparece la próxima reserva. Tocá Llegaron: sentar, elegí la mesa y se abre sola con los comensales.' },
+  ] },
   { id: 'comandas', titulo: 'Usar la pantalla de comandas', area: 'cocina', roles: ['admin', 'encargado', 'cocina', 'barra'], pasos: [
     { ir: '', foco: 'comandas', titulo: 'Tres columnas', texto: 'Pendientes, preparando y listos. Cada comanda muestra la mesa y hace cuánto entró.' },
     { ir: '', foco: 'comandas', titulo: 'El reloj', texto: 'Si una comanda tarda mucho se pone amarilla y después roja. Tocá Listo apenas sale, así medimos los tiempos.' },

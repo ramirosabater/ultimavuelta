@@ -11,10 +11,13 @@ const GRUPOS: [string, string[]][] = [
   ['Jornada', ['corte_jornada', 'zona_horaria', 'dias_cerrado']],
   ['Compras y costos', ['cobertura_dias', 'colchon_pct', 'costo_objetivo']],
   ['Alertas de comandas', ['alerta_cocina', 'alerta_barra']],
+  ['Reservas', ['reservas_activas', 'reservas_horarios', 'reservas_cupo', 'reservas_max', 'reservas_dias', 'reservas_min_horas', 'reservas_telefono']],
 ]
 const ETIQUETA: Record<string, string> = {
   nombre_local: 'Nombre', bajada_local: 'Segunda línea', corte_jornada: 'Hora de corte', zona_horaria: 'Zona horaria', dias_cerrado: 'Días cerrado',
   cobertura_dias: 'Comprar para (días)', colchon_pct: 'Colchón (%)', costo_objetivo: 'Costo objetivo (%)', alerta_cocina: 'Parrilla (min amarillo, rojo)', alerta_barra: 'Barra (min amarillo, rojo)',
+  reservas_activas: 'Página de reservas', reservas_horarios: 'Horarios', reservas_cupo: 'Lugares por horario (personas)', reservas_max: 'Máximo de personas por reserva',
+  reservas_dias: 'Días de anticipación', reservas_min_horas: 'Hasta cuántas horas antes', reservas_telefono: 'WhatsApp del local',
 }
 
 export default function Configuracion() {
@@ -40,7 +43,10 @@ export default function Configuracion() {
     <SubNavAdmin />
     {GRUPOS.map(([t, claves]) => <section className="panel" key={t} style={{ marginBottom: 16 }}>
       <h3 style={{ marginBottom: 10 }}>{t}</h3>
-      {claves.map((k) => k === 'dias_cerrado'
+      {claves.map((k) => k === 'reservas_activas'
+        ? <div className="campo" key={k}>{ETIQUETA[k]}<div className="chips" style={{ marginTop: 6 }}>{[['si', 'Prendida'], ['no', 'Apagada']].map(([v, t]) => <button key={v} type="button" className="chip" aria-pressed={(val(k) || 'si') === v} onClick={() => set(k, v)}>{t}</button>)}</div>
+            <small>{desc(k)}. Link para clientes: <a href="/reservar" target="_blank" rel="noreferrer">{window.location.origin}/reservar</a></small></div>
+        : k === 'dias_cerrado'
         ? <div className="campo" key={k}>{ETIQUETA[k]}<div className="chips" style={{ marginTop: 6 }}>{[1, 2, 3, 4, 5, 6, 0].map((x) => { const on = cerrados.includes(String(x)); return <button key={x} type="button" className="chip" aria-pressed={on}
             onClick={() => set(k, (on ? cerrados.filter((c) => c !== String(x)) : [...cerrados, String(x)]).join(','))}>{DIAS_LARGO[x]}</button> })}</div><small>{desc(k)}</small></div>
         : <label className="campo" key={k}>{ETIQUETA[k] ?? k}<input id={`cfg-${k}`} value={val(k)} onChange={(e) => set(k, e.target.value)} />{desc(k) && <small>{desc(k)}</small>}</label>)}

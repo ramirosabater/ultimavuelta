@@ -75,3 +75,10 @@ export const CAT_GASTO = ['Mercadería', 'Alquiler', 'Sueldos y cargas', 'Luz, g
   'Mantenimiento', 'Limpieza', 'Publicidad', 'Comisiones y bancos', 'Caja chica', 'Otros']
 export const MOTIVOS_MERMA = ['Vencido o en mal estado', 'Se quemó o salió mal', 'Devolución del cliente', 'Rotura o derrame', 'Sobrante del día', 'Otro']
 export const UNIDADES = ['kg', 'g', 'L', 'ml', 'u.', 'atados', 'bolsas']
+
+export type EstadoReserva = 'pendiente' | 'confirmada' | 'sentada' | 'cancelada' | 'no_vino'
+export interface Reserva {
+  id: number; codigo: string; nombre: string; telefono: string; personas: number; fecha: string; hora: string
+  nota: string | null; estado: EstadoReserva; origen: 'web' | 'telefono' | 'local'; mesa_id: number | null
+  creado: string; creado_por: string | null; atendido: string | null; cancelada_por: 'cliente' | 'local' | null
+}
