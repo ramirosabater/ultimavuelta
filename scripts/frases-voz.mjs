@@ -36,3 +36,11 @@ const lista = [...frases].map((texto) => ({ id: claveVoz(texto), texto }))
 mkdirSync('voz', { recursive: true })
 writeFileSync('voz/frases.json', JSON.stringify(lista, null, 1) + '\n')
 console.log(`${lista.length} frases en voz/frases.json`)
+
+// Las que todavía no están grabadas (para grabar solo esas) y las grabadas que ya no se usan
+let grabadas = {}
+try { grabadas = JSON.parse(readFileSync('web/public/voz/indice.json', 'utf8')) } catch { /* todavía no hay */ }
+const nuevas = lista.filter((f) => !grabadas[f.id])
+const sobran = Object.keys(grabadas).filter((id) => !lista.some((f) => f.id === id))
+writeFileSync('voz/frases-nuevas.json', JSON.stringify(nuevas, null, 1) + '\n')
+console.log(`${nuevas.length} sin grabar en voz/frases-nuevas.json${sobran.length ? ` · ${sobran.length} grabadas que ya no se usan: ${sobran.join(', ')}` : ''}`)
