@@ -1,5 +1,5 @@
 -- =====================================================================
--- Última Vuelta · base completa (= las 4 migraciones de supabase/migrations, en orden)
+-- Última Vuelta · base completa (= las migraciones de supabase/migrations, en orden)
 -- Se corre UNA vez, en un proyecto Supabase nuevo, desde el SQL Editor.
 -- Generado con: cat supabase/migrations/*.sql
 -- =====================================================================
@@ -84,6 +84,21 @@ create table proveedores (
   activo     boolean not null default true
 );
 
+-- Tabla de referencia: cuánto se pierde al limpiar y cuánto queda al cocinar cada tipo de artículo.
+-- Valores aproximados de tablas generales para arrancar; las pruebas de rendimiento propias mandan.
+create table referencias (
+  id             bigint generated always as identity primary key,
+  nombre         text not null unique,
+  grupo          text not null,
+  unidad         text not null default 'kg',
+  limpieza_pct   numeric(5,2) not null default 0 check (limpieza_pct between 0 and 90),
+  rinde_coccion  numeric(6,3) not null default 1 check (rinde_coccion > 0 and rinde_coccion <= 6),  -- cocido / limpio
+  coccion        text,                              -- cómo se cocina en ese rinde (parrilla, frito, hervido…)
+  porcion        numeric(10,3),                     -- porción típica por plato
+  porcion_es     text not null default 'cocido' check (porcion_es in ('cocido', 'limpio')),
+  nota           text
+);
+
 create table insumos (
   id           bigint generated always as identity primary key,
   nombre       text not null unique,
@@ -96,6 +111,8 @@ create table insumos (
   pack_nombre  text,                                -- bolsa, botella, docena
   proveedor_id bigint references proveedores(id) on delete set null,
   vence        date,
+  rinde_coccion numeric(6,3) not null default 1 check (rinde_coccion > 0 and rinde_coccion <= 6),  -- cocido / limpio: 0,70 la carne, 2,6 el arroz
+  referencia_id bigint references referencias(id) on delete set null,
   activo       boolean not null default true
 );
 create index insumos_proveedor_idx on insumos (proveedor_id);
@@ -103,7 +120,8 @@ create index insumos_proveedor_idx on insumos (proveedor_id);
 create table receta_items (
   producto_id bigint not null references productos(id) on delete cascade,
   insumo_id   bigint not null references insumos(id) on delete restrict,
-  cantidad    numeric(14,4) not null check (cantidad > 0),   -- limpia, por porción, en la unidad del insumo
+  cantidad    numeric(14,4) not null check (cantidad > 0),   -- por porción, en la unidad del insumo
+  cocido      boolean not null default false,                 -- true: la cantidad es como sale al plato (ya cocido)
   primary key (producto_id, insumo_id)
 );
 create index receta_insumo_idx on receta_items (insumo_id);
@@ -377,6 +395,10 @@ create policy mesas_gestion       on mesas       for all using ((select es_gesti
 -- Abrir mesas, cargar y confirmar pedidos, avanzar comandas, atender llamados y cobrar se hace con las
 -- funciones de 0002: así los precios salen siempre de la carta y cada rol hace solo lo suyo.
 
+alter table referencias enable row level security;
+create policy referencias_leer    on referencias for select using ((select es_personal()));
+create policy referencias_gestion on referencias for all using ((select es_gestion())) with check ((select es_gestion()));
+
 alter table perfiles enable row level security;
 create policy perfiles_leer  on perfiles for select using (id = (select auth.uid()) or (select es_gestion()));
 create policy perfiles_admin on perfiles for all using ((select es_admin())) with check ((select es_admin()));
@@ -479,10 +501,17 @@ end $$;
 create or replace function bruto(p_limpio numeric, p_merma numeric) returns numeric
 language sql immutable as $$ select p_limpio / (1 - least(coalesce(p_merma, 0), 90) / 100.0) $$;
 
+-- Cantidad a comprar para una porción: si la receta está en cocido, primero se pasa a limpio (÷ rinde de cocción)
+-- y después se suma la merma de limpieza
+create or replace function crudo(p_cant numeric, p_cocido boolean, p_merma numeric, p_rinde numeric) returns numeric
+language sql immutable as $$
+  select bruto(case when p_cocido then p_cant / greatest(coalesce(p_rinde, 1), 0.01) else p_cant end, p_merma)
+$$;
+
 -- Costo de una porción según la receta y el último precio de cada artículo
 create or replace function costo_receta(p_producto bigint) returns numeric
 language sql stable set search_path = public as $$
-  select coalesce(sum(bruto(r.cantidad, i.merma_pct) * i.costo), 0)
+  select coalesce(sum(crudo(r.cantidad, r.cocido, i.merma_pct, i.rinde_coccion) * i.costo), 0)
   from receta_items r join insumos i on i.id = r.insumo_id where r.producto_id = p_producto
 $$;
 
@@ -698,7 +727,7 @@ begin
   end loop;
 
   -- Artículos de las recetas (con la merma de limpieza)
-  for r in select ri.insumo_id, sum(ti.cantidad * bruto(ri.cantidad, i.merma_pct)) q, max(i.costo) c
+  for r in select ri.insumo_id, sum(ti.cantidad * crudo(ri.cantidad, ri.cocido, i.merma_pct, i.rinde_coccion)) q, max(i.costo) c
            from ticket_items ti join receta_items ri on ri.producto_id = ti.producto_id join insumos i on i.id = ri.insumo_id
            where ti.ticket_id = v_t group by ri.insumo_id loop
     insert into movimientos_stock (insumo_id, tipo, cantidad, costo_unit, jornada, ticket_id, usuario_id)
@@ -881,8 +910,8 @@ begin
   perform exigir(es_gestion(), 'Solo dueños y encargados cambian recetas.');
   perform exigir(exists (select 1 from productos where id = p_producto), 'El plato no existe.');
   delete from receta_items where producto_id = p_producto;
-  insert into receta_items (producto_id, insumo_id, cantidad)
-  select p_producto, (x->>'insumo_id')::bigint, sum((x->>'cantidad')::numeric)
+  insert into receta_items (producto_id, insumo_id, cantidad, cocido)
+  select p_producto, (x->>'insumo_id')::bigint, sum((x->>'cantidad')::numeric), bool_or(coalesce((x->>'cocido')::boolean, false))
   from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) x
   where (x->>'cantidad')::numeric > 0 group by 2;
 end $$;
@@ -1102,8 +1131,9 @@ begin
     'cambios_precio', (select coalesce(jsonb_agg(jsonb_build_object('nombre', nombre, 'cambio', round(costo_unit / ant - 1, 4)) order by costo_unit / ant desc), '[]')
                from cambios where abs(costo_unit / ant - 1) > 0.02),
     'plato', case when p_f->>'producto' is not null then (select jsonb_build_object('id', p.id, 'nombre', p.nombre, 'precio', p.precio, 'costo', costo_receta(p.id),
-               'receta', (select coalesce(jsonb_agg(jsonb_build_object('nombre', i.nombre, 'unidad', i.unidad, 'cantidad', x.cantidad,
-                            'bruto', bruto(x.cantidad, i.merma_pct), 'costo', bruto(x.cantidad, i.merma_pct) * i.costo) order by bruto(x.cantidad, i.merma_pct) * i.costo desc), '[]')
+               'receta', (select coalesce(jsonb_agg(jsonb_build_object('nombre', i.nombre, 'unidad', i.unidad, 'cantidad', x.cantidad, 'cocido', x.cocido,
+                            'bruto', crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion), 'costo', crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion) * i.costo)
+                            order by crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion) * i.costo desc), '[]')
                           from receta_items x join insumos i on i.id = x.insumo_id where x.producto_id = p.id))
                from productos p where p.id = (p_f->>'producto')::bigint) end,
     'articulo', case when p_f->>'insumo' is not null then (select jsonb_build_object('id', i.id, 'nombre', i.nombre, 'unidad', i.unidad, 'costo', i.costo, 'hay', i.cantidad,
@@ -1222,9 +1252,9 @@ begin
   perform exigir(es_gestion(), 'La previsión es para dueños y encargados.');
   with hoy as (select * from porciones_esperadas(v_hoy)),
        prox as (select pe.* from generate_series(0, v_n - 1) k, lateral porciones_esperadas(v_hoy + k) pe),
-       uso_hoy as (select x.insumo_id, sum(h.cantidad * bruto(x.cantidad, i.merma_pct)) u from hoy h
+       uso_hoy as (select x.insumo_id, sum(h.cantidad * crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion)) u from hoy h
                    join receta_items x on x.producto_id = h.producto_id join insumos i on i.id = x.insumo_id group by 1),
-       uso as (select x.insumo_id, sum(p.cantidad * bruto(x.cantidad, i.merma_pct)) u from prox p
+       uso as (select x.insumo_id, sum(p.cantidad * crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion)) u from prox p
                join receta_items x on x.producto_id = p.producto_id join insumos i on i.id = x.insumo_id group by 1)
   select jsonb_build_object(
     'historial', exists (select 1 from tickets where jornada < v_hoy),
@@ -1433,6 +1463,15 @@ begin
       'texto', 'Con la próxima pieza de carne que llegue, hacé una prueba de rendimiento: pesala cruda y limpia.',
       'boton', 'Cómo se hace', 'circuito', 'rendimiento');
   end if;
+
+  -- Con 3 o más pruebas, si lo medido se aleja de lo cargado en el artículo
+  select string_agg(nombre, ', '), count(*) into t, n from (
+    select i.nombre from insumos i, lateral (select avg(1 - limpio / crudo) * 100 m, count(*) c
+      from (select * from rendimientos r where r.insumo_id = i.id order by fecha desc limit 5) u) z
+    where i.activo and z.c >= 3 and abs(z.m - i.merma_pct) >= 2 order by i.nombre limit 3) y;
+  if n > 0 then return next jsonb_build_object('tema', 'rendimiento-medido', 'clave', 'medido-' || t, 'prioridad', 3, 'titulo', 'Rendimiento medido',
+    'texto', format('Las pruebas de %s dan una merma distinta a la cargada. Usá lo medido así los costos y las compras son reales.', t),
+    'boton', 'Ver rendimientos', 'ir', '/stock/rendimientos'); end if;
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -1479,3 +1518,113 @@ grant execute on function carta_publica(text), pedir_desde_mesa(text, jsonb), ll
 -- Piezas internas que la app no llama directo
 revoke execute on function crear_pedido(bigint, jsonb, text, boolean) from authenticated;
 revoke execute on function items_validos(jsonb) from authenticated;
+
+-- >>> 20261112000005_referencias.sql
+-- =====================================================================
+-- Última Vuelta · Tabla de referencia de rendimientos
+-- Cuánto se pierde al limpiar (limpieza_pct), cuánto queda al cocinar (rinde_coccion = cocido / limpio)
+-- y la porción típica por plato. Cubre parrilla y también lo que puede entrar en la carta:
+-- pescados y mariscos, pollo, cerdo, cordero, verduras, guarniciones, pastas, arroz, legumbres, postres y barra.
+--
+-- Son valores APROXIMADOS para arrancar, armados con tablas generales (USDA: rendimientos de cocción
+-- y de preparación) y práctica de cocina profesional. Varían con el proveedor, la pieza, el corte y el punto.
+-- Las pruebas de Stock → Rendimientos dan el número real del local y reemplazan a estos.
+-- Los artículos toman estos valores al crearlos; cambiar esta tabla no toca los artículos ya cargados.
+-- =====================================================================
+
+insert into referencias (grupo, nombre, unidad, limpieza_pct, rinde_coccion, coccion, porcion, porcion_es, nota) values
+  -- Vacuna a la parrilla (porción: lo que llega al plato, cocido)
+  ('Carne vacuna', 'Vacío',               'kg', 12, 0.70, 'parrilla, a punto', 0.300, 'cocido', 'Sacar la telita y el exceso de grasa'),
+  ('Carne vacuna', 'Asado de tira',       'kg',  5, 0.65, 'parrilla, lento',   0.350, 'cocido', 'Con hueso: la porción incluye el hueso'),
+  ('Carne vacuna', 'Entraña',             'kg', 15, 0.70, 'parrilla, fuego fuerte', 0.250, 'cocido', 'Pelar la membrana'),
+  ('Carne vacuna', 'Matambre',            'kg', 10, 0.65, 'parrilla o al horno', 0.250, 'cocido', null),
+  ('Carne vacuna', 'Bife de chorizo',     'kg', 10, 0.75, 'parrilla, a punto', 0.300, 'cocido', 'Rinde baja con más cocción'),
+  ('Carne vacuna', 'Ojo de bife',         'kg', 10, 0.75, 'parrilla, a punto', 0.300, 'cocido', null),
+  ('Carne vacuna', 'Bife ancho',          'kg', 12, 0.73, 'parrilla, a punto', 0.300, 'cocido', null),
+  ('Carne vacuna', 'Lomo',                'kg', 15, 0.78, 'parrilla o plancha', 0.250, 'cocido', 'Sacar cordón y grasa'),
+  ('Carne vacuna', 'Colita de cuadril',   'kg',  8, 0.72, 'parrilla',          0.250, 'cocido', null),
+  ('Carne vacuna', 'Tapa de asado',       'kg', 10, 0.68, 'parrilla, lento',   0.300, 'cocido', null),
+  ('Carne vacuna', 'Picaña',              'kg',  8, 0.72, 'parrilla',          0.250, 'cocido', 'Dejar la grasa de cobertura'),
+  ('Carne vacuna', 'Falda',               'kg', 10, 0.60, 'parrilla lenta o guiso', 0.300, 'cocido', null),
+  ('Carne vacuna', 'Carne picada',        'kg',  0, 0.75, 'plancha (hamburguesa)', 0.150, 'cocido', 'Una hamburguesa de 200 g cruda queda en unos 150 g'),
+  ('Carne vacuna', 'Nalga o peceto para milanesa', 'kg', 10, 0.80, 'frita o al horno, rebozada', 0.200, 'cocido', 'El pan rallado y el huevo van aparte en la receta'),
+  ('Carne vacuna', 'Carne para guiso o estofado', 'kg', 10, 0.65, 'guisada', 0.250, 'cocido', null),
+  ('Carne vacuna', 'Carne para empanadas', 'kg', 5, 0.75, 'salteada', 0.040, 'cocido', 'Por empanada'),
+  -- Achuras
+  ('Achuras', 'Chorizo',                  'u.', 0, 1, 'parrilla', 1, 'cocido', 'Por unidad'),
+  ('Achuras', 'Morcilla',                 'u.', 0, 1, 'parrilla', 1, 'cocido', 'Por unidad'),
+  ('Achuras', 'Mollejas',                 'kg', 25, 0.65, 'parrilla', 0.200, 'cocido', 'Blanquear y pelar'),
+  ('Achuras', 'Chinchulines',             'kg', 30, 0.55, 'parrilla, bien hechos', 0.200, 'cocido', 'Limpiar bien; pierden mucho'),
+  ('Achuras', 'Riñón',                    'kg', 20, 0.70, 'parrilla', 0.200, 'cocido', null),
+  ('Achuras', 'Provoleta',                'kg',  0, 0.90, 'parrilla o plancha', 0.150, 'limpio', 'Queso provolone en rodaja'),
+  -- Cerdo
+  ('Cerdo', 'Bondiola',                   'kg',  5, 0.70, 'parrilla o al horno', 0.300, 'cocido', null),
+  ('Cerdo', 'Matambre de cerdo',          'kg',  8, 0.68, 'parrilla',          0.300, 'cocido', null),
+  ('Cerdo', 'Pechito o costillas de cerdo', 'kg', 5, 0.65, 'parrilla o al horno', 0.400, 'cocido', 'Con hueso'),
+  ('Cerdo', 'Solomillo de cerdo',         'kg',  8, 0.75, 'parrilla o plancha', 0.250, 'cocido', null),
+  ('Cerdo', 'Carré de cerdo',             'kg',  8, 0.75, 'parrilla o al horno', 0.280, 'cocido', null),
+  -- Pollo
+  ('Pollo', 'Pollo entero',               'kg',  5, 0.70, 'parrilla o al horno', 0.400, 'cocido', 'Con hueso: medio pollo ronda 0,5 kg cocido'),
+  ('Pollo', 'Pechuga de pollo',           'kg', 10, 0.75, 'plancha o parrilla', 0.200, 'cocido', 'Sin piel ni hueso'),
+  ('Pollo', 'Pata y muslo',               'kg',  5, 0.70, 'parrilla o al horno', 0.300, 'cocido', 'Con hueso'),
+  ('Pollo', 'Suprema para milanesa',      'kg', 10, 0.82, 'frita o al horno, rebozada', 0.200, 'cocido', 'El rebozado va aparte'),
+  -- Cordero y chivito
+  ('Cordero', 'Cordero patagónico',       'kg',  5, 0.65, 'asador o parrilla, lento', 0.400, 'cocido', 'Con hueso'),
+  ('Cordero', 'Chivito',                  'kg',  5, 0.65, 'asador o parrilla, lento', 0.400, 'cocido', 'Con hueso'),
+  ('Cordero', 'Carré de cordero',         'kg', 10, 0.75, 'parrilla o plancha', 0.250, 'cocido', null),
+  -- Pescados y mariscos
+  ('Pescados y mariscos', 'Filet de merluza',   'kg',  5, 0.80, 'plancha o frito', 0.200, 'cocido', null),
+  ('Pescados y mariscos', 'Filet de abadejo',   'kg',  5, 0.80, 'plancha o parrilla', 0.200, 'cocido', null),
+  ('Pescados y mariscos', 'Filet de salmón',    'kg',  5, 0.80, 'plancha o parrilla', 0.200, 'cocido', null),
+  ('Pescados y mariscos', 'Pescado entero para filetear', 'kg', 55, 0.80, 'plancha o parrilla', 0.200, 'cocido', 'De la pieza entera sale menos de la mitad en filet'),
+  ('Pescados y mariscos', 'Langostinos con cáscara', 'kg', 45, 0.85, 'plancha o hervidos', 0.150, 'cocido', 'Pelados y sin cabeza'),
+  ('Pescados y mariscos', 'Calamar',            'kg', 30, 0.75, 'rabas fritas o plancha', 0.180, 'cocido', 'Limpio, en aros'),
+  ('Pescados y mariscos', 'Mejillones con valva', 'kg', 70, 0.85, 'al vapor o a la provenzal', 0.150, 'cocido', 'Se aprovecha alrededor de un tercio'),
+  ('Pescados y mariscos', 'Pulpo',              'kg', 15, 0.55, 'hervido y a la parrilla', 0.150, 'cocido', 'Pierde casi la mitad al hervir'),
+  ('Pescados y mariscos', 'Cornalitos',         'kg',  5, 0.80, 'fritos', 0.200, 'cocido', null),
+  -- Verduras y guarniciones
+  ('Verduras', 'Papas para fritas',       'kg', 20, 0.55, 'fritas',     0.200, 'cocido', 'Peladas; al freír pierden casi la mitad del agua'),
+  ('Verduras', 'Papas al horno o puré',   'kg', 15, 0.90, 'horno o hervidas', 0.200, 'cocido', null),
+  ('Verduras', 'Batata',                  'kg', 20, 0.85, 'horno o frita', 0.200, 'cocido', null),
+  ('Verduras', 'Cebolla',                 'kg', 10, 1,    'cruda', 0.050, 'limpio', 'Caramelizada rinde menos de la mitad'),
+  ('Verduras', 'Tomate',                  'kg',  8, 1,    'crudo', 0.100, 'limpio', null),
+  ('Verduras', 'Lechuga',                 'kg', 25, 1,    'cruda', 0.060, 'limpio', 'Hojas feas y tronco'),
+  ('Verduras', 'Rúcula',                  'kg', 15, 1,    'cruda', 0.040, 'limpio', null),
+  ('Verduras', 'Zanahoria',               'kg', 15, 1,    'cruda o hervida', 0.060, 'limpio', null),
+  ('Verduras', 'Morrón',                  'kg', 18, 0.65, 'asado a la parrilla', 0.080, 'cocido', 'Sin semillas ni cabo'),
+  ('Verduras', 'Berenjena',               'kg', 10, 0.70, 'parrilla o escabeche', 0.100, 'cocido', null),
+  ('Verduras', 'Zapallito',               'kg',  8, 0.80, 'parrilla o salteado', 0.100, 'cocido', null),
+  ('Verduras', 'Calabaza o zapallo',      'kg', 30, 0.85, 'horno o puré', 0.150, 'cocido', 'Cáscara y semillas'),
+  ('Verduras', 'Choclo',                  'kg', 60, 1,    'desgranado', 0.080, 'limpio', 'De la mazorca se aprovechan los granos'),
+  ('Verduras', 'Champiñones',             'kg',  5, 0.65, 'salteados', 0.080, 'cocido', null),
+  ('Verduras', 'Ajo',                     'kg', 12, 1,    'crudo', 0.005, 'limpio', null),
+  ('Verduras', 'Perejil y verdes',        'kg', 30, 1,    'crudo', 0.005, 'limpio', 'Tallos'),
+  ('Verduras', 'Limón para jugo',         'kg', 60, 1,    'exprimido', 0.030, 'limpio', 'De un kilo salen unos 400 ml de jugo'),
+  -- Huevos y lácteos
+  ('Huevos y lácteos', 'Huevos',          'u.', 0, 1,    null, 1, 'limpio', 'Por unidad'),
+  ('Huevos y lácteos', 'Muzzarella',      'kg', 0, 0.90, 'gratinada', 0.100, 'limpio', null),
+  ('Huevos y lácteos', 'Queso rallado',   'kg', 0, 1,    null, 0.020, 'limpio', null),
+  ('Huevos y lácteos', 'Crema',           'L',  0, 1,    null, 0.050, 'limpio', null),
+  ('Huevos y lácteos', 'Manteca',         'kg', 0, 1,    null, 0.020, 'limpio', null),
+  -- Secos: crecen al cocinar (rinde mayor a 1)
+  ('Secos', 'Arroz',                      'kg', 0, 2.60, 'hervido', 0.200, 'cocido', '80 g crudos dan unos 200 g cocidos'),
+  ('Secos', 'Fideos secos',               'kg', 0, 2.30, 'hervidos', 0.250, 'cocido', '110 g secos dan unos 250 g cocidos'),
+  ('Secos', 'Pasta fresca',               'kg', 0, 1.40, 'hervida', 0.250, 'cocido', null),
+  ('Secos', 'Polenta',                    'kg', 0, 4.00, 'hervida', 0.250, 'cocido', null),
+  ('Secos', 'Lentejas o porotos secos',   'kg', 3, 2.40, 'hervidos', 0.200, 'cocido', 'Remojar; sacar piedritas'),
+  ('Secos', 'Garbanzos secos',            'kg', 2, 2.20, 'hervidos', 0.200, 'cocido', null),
+  ('Secos', 'Pan rallado',                'kg', 0, 1,    null, 0.030, 'limpio', 'Por milanesa'),
+  -- Panificados y postres
+  ('Panificados y postres', 'Pan',        'u.', 0, 1, null, 1, 'limpio', 'Por unidad'),
+  ('Panificados y postres', 'Tapas de empanada', 'u.', 0, 1, null, 1, 'limpio', 'Por unidad'),
+  ('Panificados y postres', 'Dulce de leche', 'kg', 0, 1, null, 0.050, 'limpio', null),
+  ('Panificados y postres', 'Helado',     'kg', 5, 1, 'servido', 0.120, 'limpio', 'Lo que queda en el balde'),
+  ('Panificados y postres', 'Frutas para postre o tragos', 'kg', 20, 1, 'pelada', 0.100, 'limpio', null),
+  -- Barra (porción: lo que se sirve)
+  ('Barra', 'Cerveza en barril',          'L', 7, 1, 'tirada', 0.500, 'limpio', 'Espuma, purga y cambio de barril. Pinta 0,5 L'),
+  ('Barra', 'Cerveza en botella o lata',  'u.', 0, 1, null, 1, 'limpio', 'Por unidad'),
+  ('Barra', 'Vino por copa',              'L', 2, 1, 'servido', 0.150, 'limpio', 'Una botella de 750 ml da 5 copas'),
+  ('Barra', 'Bebidas blancas y aperitivos', 'L', 3, 1, 'servido', 0.060, 'limpio', 'Gin, fernet, aperitivos: medida de 60 ml'),
+  ('Barra', 'Gaseosa o agua tónica',      'L', 3, 1, 'servida', 0.200, 'limpio', null),
+  ('Barra', 'Hielo',                      'kg', 10, 1, null, 0.150, 'limpio', 'Lo que se derrite antes de usarse')
+on conflict (nombre) do nothing;

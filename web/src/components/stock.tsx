@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { rpc, tabla, useConsulta } from '../lib/datos'
 import { invocar, supabase } from '../lib/supabase'
-import { bruto, hoy, num, pct, plata } from '../lib/formato'
-import { MOTIVOS_MERMA, UNIDADES, type Cuenta, type Insumo, type Proveedor } from '../lib/tipos'
+import { crudo, hoy, num, pct, plata } from '../lib/formato'
+import { MOTIVOS_MERMA, UNIDADES, type Cuenta, type Insumo, type Proveedor, type Referencia } from '../lib/tipos'
 import { Modal, Pill, useAccion } from './ui'
 
 /** Artículos, proveedores y cuentas: lo que usan casi todas las pantallas de stock */
@@ -40,12 +40,22 @@ export function pagoPorDefecto(p: Proveedor | undefined, cuentas: Cuenta[]) {
 }
 
 // ------------------------------------------------------------------ alta y edición de artículos
-export function ArticuloForm({ insumo, proveedores, onCerrar, onListo }: { insumo: Insumo | null; proveedores: Proveedor[]; onCerrar: () => void; onListo: () => void }) {
+export function ArticuloForm({ insumo, desde, proveedores, onCerrar, onListo }: { insumo: Insumo | null; desde?: Referencia; proveedores: Proveedor[]; onCerrar: () => void; onListo: () => void }) {
   const [f, setF] = useState({
-    nombre: insumo?.nombre ?? '', unidad: insumo?.unidad ?? 'kg', costo: String(insumo?.costo ?? ''), cantidad: String(insumo?.cantidad ?? 0),
-    minimo: String(insumo?.minimo ?? 0), merma_pct: String(insumo?.merma_pct ?? 0), pack: String(insumo?.pack ?? ''), pack_nombre: insumo?.pack_nombre ?? '',
+    nombre: insumo?.nombre ?? desde?.nombre ?? '', unidad: insumo?.unidad ?? desde?.unidad ?? 'kg', costo: String(insumo?.costo ?? ''), cantidad: String(insumo?.cantidad ?? 0),
+    minimo: String(insumo?.minimo ?? 0), merma_pct: String(insumo?.merma_pct ?? desde?.limpieza_pct ?? 0), pack: String(insumo?.pack ?? ''), pack_nombre: insumo?.pack_nombre ?? '',
     proveedor_id: insumo?.proveedor_id ? String(insumo.proveedor_id) : '', vence: insumo?.vence ?? '',
+    rinde: String(Math.round(Number(insumo?.rinde_coccion ?? desde?.rinde_coccion ?? 1) * 1000) / 10),
+    referencia_id: insumo?.referencia_id ? String(insumo.referencia_id) : desde ? String(desde.id) : '',
   })
+  const refs = useConsulta(() => tabla<Referencia[]>(supabase.from('referencias').select('*').order('id')))
+  // Al escribir el nombre de un artículo nuevo, si coincide con la tabla se propone esa referencia
+  const parecida = !insumo && !f.referencia_id && f.nombre.trim().length >= 3 ? (refs.datos ?? []).find((r) => r.nombre.toLowerCase().includes(f.nombre.trim().toLowerCase()) || f.nombre.trim().toLowerCase().includes(r.nombre.toLowerCase())) : undefined
+  function usarReferencia(id: string) {
+    const r = refs.datos?.find((x) => String(x.id) === id)
+    if (!r) { setF({ ...f, referencia_id: '' }); return }
+    setF({ ...f, referencia_id: id, nombre: f.nombre.trim() ? f.nombre : r.nombre, unidad: insumo ? f.unidad : r.unidad, merma_pct: String(r.limpieza_pct), rinde: String(Math.round(Number(r.rinde_coccion) * 1000) / 10) })
+  }
   const [err, setErr] = useState('')
   const { correr, ocupado } = useAccion()
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -55,6 +65,7 @@ export function ArticuloForm({ insumo, proveedores, onCerrar, onListo }: { insum
       nombre: f.nombre.trim(), unidad: f.unidad.trim() || 'u.', costo: Number(f.costo) || 0, minimo: Number(f.minimo) || 0,
       merma_pct: Math.min(90, Math.max(0, Number(f.merma_pct) || 0)), pack: Number(f.pack) || null, pack_nombre: f.pack_nombre.trim() || null,
       proveedor_id: f.proveedor_id ? Number(f.proveedor_id) : null, vence: f.vence || null,
+      rinde_coccion: Math.min(6, Math.max(0.01, (Number(f.rinde) || 100) / 100)), referencia_id: f.referencia_id ? Number(f.referencia_id) : null,
       ...(insumo ? {} : { cantidad: Number(f.cantidad) || 0 }),
     }
     const ok = await correr(async () => {
@@ -75,6 +86,11 @@ export function ArticuloForm({ insumo, proveedores, onCerrar, onListo }: { insum
       {insumo && <button className="btn ghost" disabled={ocupado} onClick={async () => { if (await correr(async () => { await supabase.from('insumos').update({ activo: !insumo.activo }).eq('id', insumo.id) }, insumo.activo ? 'Artículo desactivado' : 'Artículo activado')) onListo() }}>{insumo.activo ? 'Desactivar' : 'Activar'}</button>}
       <span className="grow" /><button className="btn pri" disabled={ocupado} onClick={guardar}>Guardar</button></>}>
     <label className="campo">Nombre<input id="i-nom" value={f.nombre} onChange={set('nombre')} placeholder="Vacío, papas, gin…" autoFocus /></label>
+    {parecida && <div className="notice" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="grow">En la tabla de referencia está <b>{parecida.nombre}</b>: {num(parecida.limpieza_pct)} % de limpieza, {textoRinde(parecida.rinde_coccion)}.</span>
+      <button type="button" className="btn sm" onClick={() => usarReferencia(String(parecida.id))}>Usar esos valores</button></div>}
+    <label className="campo">Tabla de referencia<select id="i-ref" value={f.referencia_id} onChange={(e) => usarReferencia(e.target.value)}>
+      <option value="">Sin referencia</option>{porGrupo(refs.datos ?? []).map(([g, rs]) => <optgroup key={g} label={g}>{rs.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}</optgroup>)}</select>
+      <small>Completa la merma y el rinde con valores aproximados para arrancar. Después, tus pruebas de rendimiento los corrigen.</small></label>
     <div className="two">
       <label className="campo">Unidad<input id="i-un" list="i-unidades" value={f.unidad} onChange={set('unidad')} /><datalist id="i-unidades">{UNIDADES.map((u) => <option key={u} value={u} />)}</datalist></label>
       <label className="campo">Costo por unidad ($)<input id="i-costo" type="number" step="any" min={0} inputMode="decimal" value={f.costo} onChange={set('costo')} /></label>
@@ -85,6 +101,8 @@ export function ArticuloForm({ insumo, proveedores, onCerrar, onListo }: { insum
     </div>
     <label className="campo">Merma de limpieza (%)<input id="i-merma" type="number" step="any" min={0} max={90} inputMode="decimal" value={f.merma_pct} onChange={set('merma_pct')} />
       <small>Lo que se pierde al limpiar o porcionar. Ej.: vacío 12 %, mollejas 25 %, papas 20 %. Mejor medirlo en Rendimientos.</small></label>
+    <label className="campo">Queda al cocinar (% del peso limpio)<input id="i-rinde" type="number" step="any" min={1} max={600} inputMode="decimal" value={f.rinde} onChange={set('rinde')} />
+      <small>Carne a la parrilla ~70 %, papas fritas ~55 %. Lo que crece pasa de 100: arroz ~260 %, fideos ~230 %. Sirve para las recetas cargadas como salen al plato.</small></label>
     <div className="two">
       <label className="campo">Se compra de a (cantidad)<input id="i-pack" type="number" step="any" min={0} inputMode="decimal" value={f.pack} onChange={set('pack')} placeholder="Ej.: 10" /></label>
       <label className="campo">Presentación<input id="i-packn" value={f.pack_nombre} onChange={set('pack_nombre')} placeholder="bolsa, caja, barril" /></label>
@@ -246,6 +264,11 @@ function RevisarFactura({ l, insumos, proveedores, cuentas, onCerrar, onListo }:
   </Modal>
 }
 
-/** Costo de una porción con la merma de limpieza */
-export const costoPorcion = (receta: { insumo_id: number; cantidad: number }[], insumos: Insumo[]) =>
-  receta.reduce((s, r) => { const i = insumos.find((x) => x.id === r.insumo_id); return s + (i ? bruto(r.cantidad, i.merma_pct) * i.costo : 0) }, 0)
+/** Costo de una porción: merma de limpieza y, si la cantidad está en cocido, el rinde al cocinar */
+export const costoPorcion = (receta: { insumo_id: number; cantidad: number; cocido?: boolean }[], insumos: Insumo[]) =>
+  receta.reduce((s, r) => { const i = insumos.find((x) => x.id === r.insumo_id); return s + (i ? crudo(r.cantidad, !!r.cocido, i.merma_pct, i.rinde_coccion) * i.costo : 0) }, 0)
+
+/** Las referencias agrupadas, para elegir en un select */
+export const porGrupo = (refs: Referencia[]) => [...new Set(refs.map((r) => r.grupo))].map((g) => [g, refs.filter((r) => r.grupo === g)] as const)
+/** "queda el 70 %" / "rinde ×2,6" */
+export const textoRinde = (r: number) => Number(r) === 1 ? 'no cambia al cocinar' : Number(r) < 1 ? `al cocinar queda el ${pct(Number(r))}` : `al cocinar rinde ×${num(r)}`

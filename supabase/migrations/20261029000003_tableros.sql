@@ -180,8 +180,9 @@ begin
     'cambios_precio', (select coalesce(jsonb_agg(jsonb_build_object('nombre', nombre, 'cambio', round(costo_unit / ant - 1, 4)) order by costo_unit / ant desc), '[]')
                from cambios where abs(costo_unit / ant - 1) > 0.02),
     'plato', case when p_f->>'producto' is not null then (select jsonb_build_object('id', p.id, 'nombre', p.nombre, 'precio', p.precio, 'costo', costo_receta(p.id),
-               'receta', (select coalesce(jsonb_agg(jsonb_build_object('nombre', i.nombre, 'unidad', i.unidad, 'cantidad', x.cantidad,
-                            'bruto', bruto(x.cantidad, i.merma_pct), 'costo', bruto(x.cantidad, i.merma_pct) * i.costo) order by bruto(x.cantidad, i.merma_pct) * i.costo desc), '[]')
+               'receta', (select coalesce(jsonb_agg(jsonb_build_object('nombre', i.nombre, 'unidad', i.unidad, 'cantidad', x.cantidad, 'cocido', x.cocido,
+                            'bruto', crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion), 'costo', crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion) * i.costo)
+                            order by crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion) * i.costo desc), '[]')
                           from receta_items x join insumos i on i.id = x.insumo_id where x.producto_id = p.id))
                from productos p where p.id = (p_f->>'producto')::bigint) end,
     'articulo', case when p_f->>'insumo' is not null then (select jsonb_build_object('id', i.id, 'nombre', i.nombre, 'unidad', i.unidad, 'costo', i.costo, 'hay', i.cantidad,
@@ -300,9 +301,9 @@ begin
   perform exigir(es_gestion(), 'La previsión es para dueños y encargados.');
   with hoy as (select * from porciones_esperadas(v_hoy)),
        prox as (select pe.* from generate_series(0, v_n - 1) k, lateral porciones_esperadas(v_hoy + k) pe),
-       uso_hoy as (select x.insumo_id, sum(h.cantidad * bruto(x.cantidad, i.merma_pct)) u from hoy h
+       uso_hoy as (select x.insumo_id, sum(h.cantidad * crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion)) u from hoy h
                    join receta_items x on x.producto_id = h.producto_id join insumos i on i.id = x.insumo_id group by 1),
-       uso as (select x.insumo_id, sum(p.cantidad * bruto(x.cantidad, i.merma_pct)) u from prox p
+       uso as (select x.insumo_id, sum(p.cantidad * crudo(x.cantidad, x.cocido, i.merma_pct, i.rinde_coccion)) u from prox p
                join receta_items x on x.producto_id = p.producto_id join insumos i on i.id = x.insumo_id group by 1)
   select jsonb_build_object(
     'historial', exists (select 1 from tickets where jornada < v_hoy),

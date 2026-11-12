@@ -38,5 +38,7 @@ export const dow = (k: string) => fechaLocal(k).getDay()
 
 /** Cantidad que hay que comprar para tener `limpio` después de la merma de limpieza */
 export const bruto = (limpio: number, merma: number) => limpio / (1 - Math.min(90, Math.max(0, merma || 0)) / 100)
+/** Cantidad a comprar para una porción: si está en cocido se pasa a limpio (÷ rinde) y se suma la merma de limpieza */
+export const crudo = (cant: number, cocido: boolean, merma: number, rinde: number) => bruto(cocido ? cant / Math.max(Number(rinde) || 1, 0.01) : cant, merma)
 
 export const normal = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

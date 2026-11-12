@@ -16,7 +16,7 @@ interface Costos {
   mermas_motivo: { nombre: string; v: number }[]
   mermas_articulo: { nombre: string; v: number; cantidad: number; unidad: string }[]
   cambios_precio: { nombre: string; cambio: number }[]
-  plato: { id: number; nombre: string; precio: number; costo: number; receta: { nombre: string; unidad: string; cantidad: number; bruto: number; costo: number }[] } | null
+  plato: { id: number; nombre: string; precio: number; costo: number; receta: { nombre: string; unidad: string; cantidad: number; cocido: boolean; bruto: number; costo: number }[] } | null
   articulo: { id: number; nombre: string; unidad: string; costo: number; hay: number; usado: number; comprado: number; tirado: number; precios: { l: string; v: number }[]; platos: string[] } | null
 }
 const CLAVES: Clave[] = ['categoria', 'producto', 'insumo', 'proveedor']
@@ -53,8 +53,8 @@ export default function TableroCostos() {
           <Stat label="Precio" valor={plata(r.plato.precio)} /><Stat label="Costo por porción" valor={plata(r.plato.costo)} /><Stat label="Deja por unidad" valor={plata(Number(r.plato.precio) - Number(r.plato.costo))} />
           {(() => { const x = r.platos.find((p) => p.id === r.plato!.id); return x ? <><Stat label="Vendidos" valor={x.cantidad} /><Stat label="Margen generado" valor={plata(Number(x.vendido) - Number(x.costo_hist))} /></> : null })()}
         </div>
-        {r.plato.receta.length ? <div className="tbl-wrap"><table><thead><tr><th>Ingrediente</th><th className="r">Cantidad limpia</th><th className="r">Con merma</th><th className="r">Costo</th><th className="r">% del plato</th></tr></thead><tbody>
-          {r.plato.receta.map((x) => <tr key={x.nombre}><td>{x.nombre}</td><td className="r mono">{num(x.cantidad)} {x.unidad}</td><td className="r mono muted">{num(x.bruto)} {x.unidad}</td><td className="r mono">{plata(x.costo)}</td><td className="r mono">{Number(r.plato!.costo) ? pct(Number(x.costo) / Number(r.plato!.costo)) : '—'}</td></tr>)}
+        {r.plato.receta.length ? <div className="tbl-wrap"><table><thead><tr><th>Ingrediente</th><th className="r">Por porción</th><th className="r">Hay que comprar</th><th className="r">Costo</th><th className="r">% del plato</th></tr></thead><tbody>
+          {r.plato.receta.map((x) => <tr key={x.nombre}><td>{x.nombre}</td><td className="r mono">{num(x.cantidad)} {x.unidad}{x.cocido ? ' al plato' : ''}</td><td className="r mono muted">{num(x.bruto)} {x.unidad}</td><td className="r mono">{plata(x.costo)}</td><td className="r mono">{Number(r.plato!.costo) ? pct(Number(x.costo) / Number(r.plato!.costo)) : '—'}</td></tr>)}
         </tbody></table></div> : <div className="kempty">Este plato no tiene receta cargada.</div>}
       </section>}
 

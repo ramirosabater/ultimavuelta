@@ -42,7 +42,8 @@ export const CIRCUITOS: Circuito[] = [
     { ir: '/stock/compras', foco: 'lista-compras', titulo: 'Qué comprar', texto: 'Esta lista se arma con lo que hay, lo que se vende cada día y el colchón que elegiste en Configuración.' },
   ] },
   { id: 'rendimiento', titulo: 'Hacer una prueba de rendimiento', area: 'stock', roles: G, pasos: [
-    { ir: '/stock/rendimientos', foco: 'nueva-prueba', titulo: 'Pesá la pieza', texto: 'Cuando llega la carne, pesala cruda y después limpia. Con 3 o 4 pruebas sabés cuánto perdés de verdad en cada corte y el costo real por porción.' },
+    { ir: '/stock/rendimientos', foco: 'nueva-prueba', titulo: 'Pesá la pieza', texto: 'Cuando llega la carne, pesala cruda, limpia y una porción cocida. Con 3 o 4 pruebas sabés cuánto perdés de verdad en cada corte y el costo real por porción.' },
+    { ir: '/stock/rendimientos', foco: 'tabla-referencia', titulo: 'La tabla de referencia', texto: 'Mientras no tengas pruebas, acá están los valores aproximados de limpieza, cocción y porción de carnes, pescados, guarniciones, pastas y barra. Podés crear el artículo directo desde la tabla.' },
   ] },
   { id: 'inventario', titulo: 'Hacer el inventario semanal', area: 'stock', roles: G, pasos: [
     { ir: '/stock/control', foco: 'inventario', titulo: 'Contar todo', texto: 'Una vez por semana, al cierre, contá lo que hay. Con dos inventarios te muestro qué falta sin explicación y cuánta plata es.' },

@@ -137,5 +137,23 @@ select '   saldos: ' || string_agg(nombre || ' ' || saldo, ', ') from saldos_cue
 select '   previsión: ' || (prevision() - 'insumos')::text;
 select '   sugerencias del dueño: ' || string_agg(s->>'tema', ', ') from sugerencias_ayudante('tablero') s;
 select '   contexto: ' || length(contexto_ayudante()) || ' caracteres';
+
+\echo '9. Rendimientos: receta al plato y lo medido'
+-- 0,30 kg de vacío cocido: ÷ 0,70 (cocción) y ÷ 0,88 (limpieza) = 0,487 kg a comprar
+select guardar_receta((select id from productos where nombre = 'Vacío'), jsonb_build_array(
+  jsonb_build_object('insumo_id', (select id from insumos where nombre = 'Vacío'), 'cantidad', 0.30, 'cocido', true)));
+do $$ declare c numeric := costo_receta((select id from productos where nombre = 'Vacío'));
+          e numeric := round(0.30 / 0.70 / 0.88 * (select costo from insumos where nombre = 'Vacío'), 2);
+begin
+  if abs(c - e) > 0.05 then raise exception 'Costo de receta al plato mal: % en vez de %', c, e; end if;
+  if (select count(*) from referencias) < 60 then raise exception 'Falta la tabla de referencia'; end if;
+end $$;
+select format('   vacío 0,30 kg al plato: compra %s kg, cuesta %s', round(crudo(0.30, true, 12, 0.70), 3), round(costo_receta((select id from productos where nombre = 'Vacío')), 0));
+insert into rendimientos (insumo_id, proveedor, crudo, limpio, cocido)
+select id, 'Carnicería', 2, 1.6, 1.1 from insumos, generate_series(1, 3) where nombre = 'Entraña';
+select '   sugerencia de lo medido: ' || coalesce((select s->>'texto' from sugerencias_ayudante('stock') s where s->>'tema' = 'rendimiento-medido'), 'NO APARECIÓ');
+do $$ begin
+  if not exists (select 1 from sugerencias_ayudante('stock') s where s->>'tema' = 'rendimiento-medido') then raise exception 'Chichito no avisó del rendimiento medido'; end if;
+end $$;
 reset role;
 \echo 'TODO BIEN'

@@ -46,10 +46,17 @@ end $$;
 create or replace function bruto(p_limpio numeric, p_merma numeric) returns numeric
 language sql immutable as $$ select p_limpio / (1 - least(coalesce(p_merma, 0), 90) / 100.0) $$;
 
+-- Cantidad a comprar para una porción: si la receta está en cocido, primero se pasa a limpio (÷ rinde de cocción)
+-- y después se suma la merma de limpieza
+create or replace function crudo(p_cant numeric, p_cocido boolean, p_merma numeric, p_rinde numeric) returns numeric
+language sql immutable as $$
+  select bruto(case when p_cocido then p_cant / greatest(coalesce(p_rinde, 1), 0.01) else p_cant end, p_merma)
+$$;
+
 -- Costo de una porción según la receta y el último precio de cada artículo
 create or replace function costo_receta(p_producto bigint) returns numeric
 language sql stable set search_path = public as $$
-  select coalesce(sum(bruto(r.cantidad, i.merma_pct) * i.costo), 0)
+  select coalesce(sum(crudo(r.cantidad, r.cocido, i.merma_pct, i.rinde_coccion) * i.costo), 0)
   from receta_items r join insumos i on i.id = r.insumo_id where r.producto_id = p_producto
 $$;
 
@@ -265,7 +272,7 @@ begin
   end loop;
 
   -- Artículos de las recetas (con la merma de limpieza)
-  for r in select ri.insumo_id, sum(ti.cantidad * bruto(ri.cantidad, i.merma_pct)) q, max(i.costo) c
+  for r in select ri.insumo_id, sum(ti.cantidad * crudo(ri.cantidad, ri.cocido, i.merma_pct, i.rinde_coccion)) q, max(i.costo) c
            from ticket_items ti join receta_items ri on ri.producto_id = ti.producto_id join insumos i on i.id = ri.insumo_id
            where ti.ticket_id = v_t group by ri.insumo_id loop
     insert into movimientos_stock (insumo_id, tipo, cantidad, costo_unit, jornada, ticket_id, usuario_id)
@@ -448,8 +455,8 @@ begin
   perform exigir(es_gestion(), 'Solo dueños y encargados cambian recetas.');
   perform exigir(exists (select 1 from productos where id = p_producto), 'El plato no existe.');
   delete from receta_items where producto_id = p_producto;
-  insert into receta_items (producto_id, insumo_id, cantidad)
-  select p_producto, (x->>'insumo_id')::bigint, sum((x->>'cantidad')::numeric)
+  insert into receta_items (producto_id, insumo_id, cantidad, cocido)
+  select p_producto, (x->>'insumo_id')::bigint, sum((x->>'cantidad')::numeric), bool_or(coalesce((x->>'cocido')::boolean, false))
   from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) x
   where (x->>'cantidad')::numeric > 0 group by 2;
 end $$;

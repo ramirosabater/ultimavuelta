@@ -135,6 +135,15 @@ begin
       'texto', 'Con la próxima pieza de carne que llegue, hacé una prueba de rendimiento: pesala cruda y limpia.',
       'boton', 'Cómo se hace', 'circuito', 'rendimiento');
   end if;
+
+  -- Con 3 o más pruebas, si lo medido se aleja de lo cargado en el artículo
+  select string_agg(nombre, ', '), count(*) into t, n from (
+    select i.nombre from insumos i, lateral (select avg(1 - limpio / crudo) * 100 m, count(*) c
+      from (select * from rendimientos r where r.insumo_id = i.id order by fecha desc limit 5) u) z
+    where i.activo and z.c >= 3 and abs(z.m - i.merma_pct) >= 2 order by i.nombre limit 3) y;
+  if n > 0 then return next jsonb_build_object('tema', 'rendimiento-medido', 'clave', 'medido-' || t, 'prioridad', 3, 'titulo', 'Rendimiento medido',
+    'texto', format('Las pruebas de %s dan una merma distinta a la cargada. Usá lo medido así los costos y las compras son reales.', t),
+    'boton', 'Ver rendimientos', 'ir', '/stock/rendimientos'); end if;
 end $$;
 
 -- ---------------------------------------------------------------------

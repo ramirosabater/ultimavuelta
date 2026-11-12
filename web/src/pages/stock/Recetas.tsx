@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { leerParametros, rpc, tabla, useConsulta } from '../../lib/datos'
 import { supabase } from '../../lib/supabase'
-import { bruto, num, plata } from '../../lib/formato'
-import type { Categoria, Insumo, Producto, RecetaItem } from '../../lib/tipos'
+import { crudo, num, plata } from '../../lib/formato'
+import type { Categoria, Insumo, Producto, RecetaItem, Referencia } from '../../lib/tipos'
 import { SubNavStock } from './nav'
 import { costoPorcion, pillCosto } from '../../components/stock'
 import { Cabeza, Modal, Stat, useAccion } from '../../components/ui'
@@ -41,7 +41,7 @@ export default function Recetas() {
       if (!lista.length) return null
       return <div className="cat-block" key={c.id}><h3>{c.nombre}</h3>{lista.map((p) => {
         const rec = de(p.id), costo = costoPorcion(rec, insumos), fc = rec.length && p.precio ? costo / p.precio : null
-        const txt = rec.map((r) => { const i = insumos.find((x) => x.id === r.insumo_id); return i ? `${num(r.cantidad)} ${i.unidad} ${i.nombre}` : '' }).filter(Boolean).join(' · ')
+        const txt = rec.map((r) => { const i = insumos.find((x) => x.id === r.insumo_id); return i ? `${num(r.cantidad)} ${i.unidad} ${i.nombre}${r.cocido ? ' (cocido)' : ''}` : '' }).filter(Boolean).join(' · ')
         return <div className={`prod-row${p.activo ? '' : ' off'}`} key={p.id}>
           <div className="grow"><b>{p.nombre}</b><div className="muted" style={{ fontSize: 13 }}>{txt || (p.controla_stock ? 'Se cuenta por unidad (no lleva receta)' : 'Sin receta cargada')}</div></div>
           {pillCosto(fc, objetivo)}
@@ -56,10 +56,11 @@ export default function Recetas() {
 }
 
 export function EditarReceta({ producto, receta, insumos, objetivo, onCerrar, onListo }: { producto: Producto; receta: RecetaItem[]; insumos: Insumo[]; objetivo: number; onCerrar: () => void; onListo: () => void }) {
-  const [filas, setFilas] = useState(receta.length ? receta.map((r) => ({ iid: String(r.insumo_id), cant: String(r.cantidad) })) : [{ iid: '', cant: '' }])
+  const [filas, setFilas] = useState(receta.length ? receta.map((r) => ({ iid: String(r.insumo_id), cant: String(r.cantidad), cocido: !!r.cocido })) : [{ iid: '', cant: '', cocido: false }])
+  const refs = useConsulta(() => tabla<Referencia[]>(supabase.from('referencias').select('*')))
   const [err, setErr] = useState('')
   const { correr, ocupado } = useAccion()
-  const validas = filas.filter((f) => f.iid && Number(f.cant) > 0).map((f) => ({ insumo_id: Number(f.iid), cantidad: Number(f.cant) }))
+  const validas = filas.filter((f) => f.iid && Number(f.cant) > 0).map((f) => ({ insumo_id: Number(f.iid), cantidad: Number(f.cant), cocido: f.cocido }))
   const costo = costoPorcion(validas, insumos), fc = producto.precio && costo ? costo / producto.precio : null
   const activos = insumos.filter((i) => i.activo)
   async function guardar() {
@@ -69,19 +70,22 @@ export function EditarReceta({ producto, receta, insumos, objetivo, onCerrar, on
   return <Modal titulo={`Receta · ${producto.nombre}`} onCerrar={onCerrar} pie={<>
     <div className="grow"><div className="label">Costo por porción</div><div className="fila"><span className="mono" style={{ fontWeight: 600, fontSize: 18 }}>{plata(costo)}</span>{fc != null && pillCosto(fc, objetivo)}</div></div>
     <button className="btn pri" disabled={ocupado} onClick={guardar}>Guardar receta</button></>}>
-    <p className="muted" style={{ margin: 0, fontSize: 13 }}>Cantidad limpia por porción, en la unidad del artículo (0,4 kg de vacío, 60 ml de gin). La merma de limpieza se suma sola.</p>
+    <p className="muted" style={{ margin: 0, fontSize: 13 }}>Cantidad por porción, en la unidad del artículo. Elegí si es <b>como sale al plato</b> (0,30 kg de vacío cocido, 0,20 kg de arroz cocido) o <b>limpio y crudo</b> (60 ml de gin). La app calcula cuánto hay que comprar sumando la limpieza y lo que se pierde o gana al cocinar.</p>
     {!activos.length ? <div className="kempty">Primero cargá artículos en Stock → Artículos.</div> : <div className="rows">{filas.map((f, k) => {
       const i = insumos.find((x) => String(x.id) === f.iid)
       return <div className="row" key={k}>
-        <select id={`rec-i-${k}`} value={f.iid} onChange={(e) => setFilas(filas.map((x, j) => j === k ? { ...x, iid: e.target.value } : x))} style={{ flex: 2, minWidth: 150, width: 'auto' }}>
+        <select id={`rec-i-${k}`} value={f.iid} onChange={(e) => { const n = insumos.find((x) => String(x.id) === e.target.value); setFilas(filas.map((x, j) => j === k ? { ...x, iid: e.target.value, cocido: n ? Number(n.rinde_coccion) !== 1 : false } : x)) }} style={{ flex: 2, minWidth: 150, width: 'auto' }}>
           <option value="">Elegí artículo</option>{activos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
         <input id={`rec-c-${k}`} type="number" step="any" min={0} inputMode="decimal" placeholder="Cant." value={f.cant} onChange={(e) => setFilas(filas.map((x, j) => j === k ? { ...x, cant: e.target.value } : x))} style={{ flex: 1, minWidth: 80, width: 'auto' }} />
         <span className="mono muted" style={{ minWidth: '3em' }}>{i?.unidad ?? ''}</span>
-        {i && Number(f.cant) > 0 && <span className="mono muted" style={{ fontSize: 12, minWidth: 70, textAlign: 'right' }}>{plata(bruto(Number(f.cant), i.merma_pct) * i.costo)}</span>}
+        <select id={`rec-k-${k}`} aria-label="Cómo está la cantidad" value={f.cocido ? 'cocido' : 'limpio'} onChange={(e) => setFilas(filas.map((x, j) => j === k ? { ...x, cocido: e.target.value === 'cocido' } : x))} style={{ width: 'auto', flex: '0 1 130px' }}>
+          <option value="cocido">al plato</option><option value="limpio">limpio crudo</option></select>
+        {i && Number(f.cant) > 0 && <span className="mono muted" style={{ fontSize: 12, minWidth: 90, textAlign: 'right' }} title="Lo que hay que comprar y su costo">compra {num(crudo(Number(f.cant), f.cocido, i.merma_pct, i.rinde_coccion))} {i.unidad}<br />{plata(crudo(Number(f.cant), f.cocido, i.merma_pct, i.rinde_coccion) * i.costo)}</span>}
         <button className="btn sm ghost danger" onClick={() => setFilas(filas.filter((_, j) => j !== k))} aria-label="Quitar ingrediente">Quitar</button>
+        {(() => { const r = i && refs.datos?.find((x) => x.id === i.referencia_id); return r?.porcion ? <div className="muted" style={{ flexBasis: '100%', fontSize: 12 }}>Porción típica de {r.nombre.toLowerCase()}: {num(r.porcion)} {r.unidad}{r.porcion_es === 'cocido' && Number(r.rinde_coccion) !== 1 ? ' al plato' : ''}{r.nota ? ` · ${r.nota}` : ''}</div> : null })()}
       </div>
     })}</div>}
-    <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setFilas([...filas, { iid: '', cant: '' }])}>Agregar ingrediente</button>
+    <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setFilas([...filas, { iid: '', cant: '', cocido: false }])}>Agregar ingrediente</button>
     {err && <div className="err">{err}</div>}
   </Modal>
 }

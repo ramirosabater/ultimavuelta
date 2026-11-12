@@ -19,8 +19,14 @@ export interface Proveedor {
 export interface Insumo {
   id: number; nombre: string; unidad: string; cantidad: number; minimo: number; costo: number; merma_pct: number
   pack: number | null; pack_nombre: string | null; proveedor_id: number | null; vence: string | null; activo: boolean
+  rinde_coccion: number; referencia_id: number | null
 }
-export interface RecetaItem { producto_id: number; insumo_id: number; cantidad: number }
+/** Tabla de referencia: merma de limpieza, rinde al cocinar (cocido / limpio) y porción típica */
+export interface Referencia {
+  id: number; nombre: string; grupo: string; unidad: string; limpieza_pct: number; rinde_coccion: number
+  coccion: string | null; porcion: number | null; porcion_es: 'cocido' | 'limpio'; nota: string | null
+}
+export interface RecetaItem { producto_id: number; insumo_id: number; cantidad: number; cocido: boolean }
 
 export interface Mesa {
   id: number; numero: number; zona: string | null; activa: boolean; token: string; estado: EstadoMesa

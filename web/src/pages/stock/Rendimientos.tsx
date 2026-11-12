@@ -2,24 +2,27 @@ import { useState } from 'react'
 import { tabla, useConsulta } from '../../lib/datos'
 import { supabase } from '../../lib/supabase'
 import { num, pct, plata } from '../../lib/formato'
-import type { Insumo, Proveedor, Rendimiento } from '../../lib/tipos'
+import type { Insumo, Proveedor, Referencia, Rendimiento } from '../../lib/tipos'
+import { ArticuloForm, porGrupo, textoRinde } from '../../components/stock'
 import { SubNavStock } from './nav'
 import { Cabeza, Modal, Pill, useAccion } from '../../components/ui'
 
 export default function Rendimientos() {
   const { datos, error, recargar } = useConsulta(async () => {
-    const [insumos, provs, pruebas] = await Promise.all([
+    const [insumos, provs, pruebas, refs] = await Promise.all([
       tabla<Insumo[]>(supabase.from('insumos').select('*').order('nombre')),
       tabla<Proveedor[]>(supabase.from('proveedores').select('*')),
       tabla<Rendimiento[]>(supabase.from('rendimientos').select('*').order('fecha', { ascending: false })),
+      tabla<Referencia[]>(supabase.from('referencias').select('*').order('id')),
     ])
-    return { insumos, provs, pruebas }
+    return { insumos, provs, pruebas, refs }
   })
   const [nueva, setNueva] = useState(false)
+  const [crear, setCrear] = useState<Referencia | null>(null)
   const { correr, ocupado } = useAccion()
   if (error) return <div className="aviso bad">{error}</div>
   if (!datos) return <><SubNavStock /><p className="cargando">Cargando…</p></>
-  const { insumos, provs, pruebas } = datos
+  const { insumos, provs, pruebas, refs } = datos
   const ids = [...new Set(pruebas.map((p) => p.insumo_id))].filter((id) => insumos.some((i) => i.id === id))
 
   return <>
@@ -33,6 +36,9 @@ export default function Rendimientos() {
         const merma = ult.reduce((s, p) => s + (1 - p.limpio / p.crudo), 0) / ult.length
         const coc = ult.filter((p) => p.cocido), coccion = coc.length ? coc.reduce((s, p) => s + (1 - p.cocido! / p.limpio), 0) / coc.length : null
         const cargada = Number(i.merma_pct) / 100, dif = merma - cargada
+        const rindeCargado = Number(i.rinde_coccion), rindeMedido = coccion != null ? 1 - coccion : null
+        const difRinde = rindeMedido != null && rindeCargado !== 1 ? rindeMedido - rindeCargado : rindeMedido != null ? rindeMedido - 1 : 0
+        const ref = refs.find((r) => r.id === i.referencia_id), pocas = ult.length < 3
         const sirve = (1 - merma) * (coccion != null ? 1 - coccion : 1)
         const porProv = new Map<string, number[]>(); todas.forEach((p) => { const k = p.proveedor || 'Sin proveedor'; porProv.set(k, [...(porProv.get(k) ?? []), 1 - p.limpio / p.crudo]) })
         return <section className="panel" key={id}>
@@ -40,15 +46,25 @@ export default function Rendimientos() {
           <dl className="kv">
             <dt>Merma de limpieza real</dt><dd className="mono"><b>{pct(merma, 1)}</b></dd>
             <dt>Cargada en el artículo</dt><dd className="mono">{pct(cargada, 1)}</dd>
-            {coccion != null && <><dt>Pérdida en la parrilla</dt><dd className="mono">{pct(coccion, 1)}</dd></>}
+            {ref && <><dt>Tabla de referencia</dt><dd className="mono">{pct(Number(ref.limpieza_pct) / 100, 1)}{Number(ref.rinde_coccion) !== 1 ? ` · queda ${pct(Number(ref.rinde_coccion))} al cocinar` : ''}</dd></>}
+            {coccion != null && <><dt>Pérdida al cocinar</dt><dd className="mono">{pct(coccion, 1)} <span className="muted">(cargado: queda {pct(rindeCargado)})</span></dd></>}
             <dt>De 1 {i.unidad} comprado</dt><dd className="mono">se sirven {num(sirve)} {i.unidad}{coccion != null ? ' cocidos' : ' limpios'}</dd>
             <dt>Costo real por {i.unidad} limpio</dt><dd className="mono">{plata(i.costo / (1 - merma))}</dd>
           </dl>
-          {porProv.size > 1 && <div className="muted" style={{ fontSize: 13, margin: '-6px 0 10px' }}>Por proveedor: {[...porProv].map(([k, v]) => `${k} ${pct(v.reduce((s, x) => s + x, 0) / v.length, 1)}`).join(' · ')}</div>}
-          {Math.abs(dif) >= 0.01 ? <div className="alert" style={{ background: dif > 0 ? 'var(--warn-soft)' : 'var(--ok-soft)' }}>
-            <span className="grow">{dif > 0 ? 'Perdés más de lo que tenías cargado: los costos de los platos están por debajo de la realidad.' : 'Rinde mejor de lo cargado.'}</span>
-            <button className="btn sm pri" disabled={ocupado} onClick={async () => { if (await correr(async () => { const { error } = await supabase.from('insumos').update({ merma_pct: Math.round(merma * 1000) / 10 }).eq('id', id); if (error) throw new Error(error.message) }, 'Merma actualizada: los costos de los platos se recalcularon')) recargar() }}>Usar {pct(merma, 1)}</button>
-          </div> : <Pill tono="ok">El artículo ya usa la merma real</Pill>}
+          {porProv.size > 1 && (() => {
+            const prom = [...porProv].map(([k, v]) => [k, v.reduce((s, x) => s + x, 0) / v.length] as const), mejor = Math.min(...prom.map((x) => x[1]))
+            return <div style={{ fontSize: 13, margin: '-6px 0 10px' }}><span className="muted">Merma por proveedor: </span>{prom.map(([k, v], n) => <span key={k}>{n > 0 && ' · '}{k} <b className="mono" style={{ color: v - mejor >= 0.03 ? 'var(--crit)' : undefined }}>{pct(v, 1)}</b></span>)}
+              {prom.some(([, v]) => v - mejor >= 0.03) && <div style={{ color: 'var(--crit)', marginTop: 2 }}>Un proveedor rinde 3 puntos o más peor: a igual precio, te sale más caro.</div>}</div>
+          })()}
+          {Math.abs(dif) >= 0.01 || Math.abs(difRinde) >= 0.02 ? <div className="alert" style={{ background: dif > 0 || difRinde < 0 ? 'var(--warn-soft)' : 'var(--ok-soft)' }}>
+            <span className="grow">{dif > 0 || difRinde < 0 ? 'Perdés más de lo que tenías cargado: los costos y las compras están por debajo de la realidad.' : 'Rinde mejor de lo cargado.'}
+              {pocas && <span className="muted"> Con {ult.length} prueba{ult.length > 1 ? 's' : ''} todavía es poco: hacé al menos 3 antes de cambiarlo.</span>}</span>
+            <button className={`btn sm${pocas ? '' : ' pri'}`} disabled={ocupado} onClick={async () => { if (await correr(async () => {
+              const cambio: Record<string, number> = { merma_pct: Math.round(merma * 1000) / 10 }
+              if (rindeMedido != null) cambio.rinde_coccion = Math.round(rindeMedido * 1000) / 1000
+              const { error } = await supabase.from('insumos').update(cambio).eq('id', id); if (error) throw new Error(error.message)
+            }, 'Listo: el artículo usa lo medido y los costos se recalcularon')) recargar() }}>Usar lo medido</button>
+          </div> : <Pill tono="ok">El artículo ya usa lo medido</Pill>}
         </section>
       })}</div>}
     {pruebas.length > 0 && <section className="panel" style={{ marginTop: 16 }}><h3 style={{ marginBottom: 6 }}>Pruebas registradas</h3>
@@ -59,6 +75,8 @@ export default function Rendimientos() {
           <td className="r mono"><b>{pct(1 - p.limpio / p.crudo, 1)}</b></td>
           <td className="r"><button className="btn sm ghost danger" disabled={ocupado} onClick={async () => { if (await correr(async () => { await supabase.from('rendimientos').delete().eq('id', p.id) }, 'Prueba borrada')) recargar() }}>Borrar</button></td></tr>)}
       </tbody></table></div></section>}
+    <TablaReferencia refs={refs} insumos={insumos} onCrear={setCrear} abierta={!pruebas.length} />
+    {crear && <ArticuloForm insumo={null} desde={crear} proveedores={provs} onCerrar={() => setCrear(null)} onListo={() => { setCrear(null); recargar() }} />}
     {nueva && <NuevaPrueba insumos={insumos} provs={provs} onCerrar={() => setNueva(false)} onListo={() => { setNueva(false); recargar() }} />}
   </>
 }
@@ -88,4 +106,28 @@ function NuevaPrueba({ insumos, provs, onCerrar, onListo }: { insumos: Insumo[];
     {c > 0 && l > 0 && l <= c && <div style={{ fontSize: 14 }}>Merma de limpieza <b className="mono">{pct(1 - l / c, 1)}</b>{k > 0 && k <= l && <> · pérdida en la parrilla <b className="mono">{pct(1 - k / l, 1)}</b> · de lo comprado se sirve el <b className="mono">{pct(k / c, 1)}</b></>}</div>}
     {err && <div className="err">{err}</div>}
   </Modal>
+}
+
+/** La tabla de referencia completa, para consultar al armar la carta y crear artículos con esos valores */
+function TablaReferencia({ refs, insumos, onCrear, abierta }: { refs: Referencia[]; insumos: Insumo[]; onCrear: (r: Referencia) => void; abierta: boolean }) {
+  const [buscar, setBuscar] = useState('')
+  const [grupo, setGrupo] = useState('')
+  const q = buscar.trim().toLowerCase()
+  const lista = refs.filter((r) => (!grupo || r.grupo === grupo) && (!q || `${r.nombre} ${r.grupo}`.toLowerCase().includes(q)))
+  return <details className="panel" style={{ marginTop: 16 }} data-ayuda="tabla-referencia" open={abierta}>
+    <summary style={{ cursor: 'pointer' }}><h3 style={{ display: 'inline', marginBottom: 4 }}>Tabla de referencia</h3> <span className="muted" style={{ fontSize: 13 }}>· {refs.length} artículos de cocina y barra</span></summary>
+    <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '76ch' }}>Cuánto se pierde al limpiar, cuánto queda al cocinar y la porción típica de lo que puede entrar en la carta: parrilla, pescados, pollo, guarniciones, pastas, postres y barra. Son valores <b>aproximados</b> de tablas generales (USDA y práctica de cocina) para arrancar; tus pruebas de rendimiento mandan.</p>
+    <div className="fila" style={{ marginBottom: 10 }}>
+      <input id="ref-buscar" type="search" placeholder="Buscar: merluza, arroz, cordero…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ flex: '1 1 200px', width: 'auto' }} />
+      <select id="ref-grupo" value={grupo} onChange={(e) => setGrupo(e.target.value)} style={{ flex: '0 1 220px', width: 'auto' }}><option value="">Todos los grupos</option>{porGrupo(refs).map(([g]) => <option key={g}>{g}</option>)}</select>
+    </div>
+    {lista.length ? <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th className="r">Limpieza</th><th>Al cocinar</th><th className="r">Porción típica</th><th /></tr></thead><tbody>
+      {lista.map((r) => { const ya = insumos.find((i) => i.referencia_id === r.id); return <tr key={r.id}>
+        <td><b>{r.nombre}</b><div className="muted" style={{ fontSize: 12 }}>{r.grupo}{r.nota ? ` · ${r.nota}` : ''}</div></td>
+        <td className="r mono">{pct(Number(r.limpieza_pct) / 100)}</td>
+        <td style={{ fontSize: 13 }}>{textoRinde(r.rinde_coccion)}{r.coccion && <div className="muted" style={{ fontSize: 12 }}>{r.coccion}</div>}</td>
+        <td className="r mono">{r.porcion ? `${num(r.porcion)} ${r.unidad}` : '—'}{r.porcion && r.porcion_es === 'cocido' && Number(r.rinde_coccion) !== 1 && <div className="muted" style={{ fontSize: 11 }}>al plato</div>}</td>
+        <td className="r">{ya ? <Pill tono="ok">{ya.nombre}</Pill> : <button className="btn sm ghost" onClick={() => onCrear(r)}>Crear artículo</button>}</td></tr> })}
+    </tbody></table></div> : <div className="kempty">Nada coincide con la búsqueda.</div>}
+  </details>
 }

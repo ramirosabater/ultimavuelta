@@ -77,6 +77,21 @@ create table proveedores (
   activo     boolean not null default true
 );
 
+-- Tabla de referencia: cuánto se pierde al limpiar y cuánto queda al cocinar cada tipo de artículo.
+-- Valores aproximados de tablas generales para arrancar; las pruebas de rendimiento propias mandan.
+create table referencias (
+  id             bigint generated always as identity primary key,
+  nombre         text not null unique,
+  grupo          text not null,
+  unidad         text not null default 'kg',
+  limpieza_pct   numeric(5,2) not null default 0 check (limpieza_pct between 0 and 90),
+  rinde_coccion  numeric(6,3) not null default 1 check (rinde_coccion > 0 and rinde_coccion <= 6),  -- cocido / limpio
+  coccion        text,                              -- cómo se cocina en ese rinde (parrilla, frito, hervido…)
+  porcion        numeric(10,3),                     -- porción típica por plato
+  porcion_es     text not null default 'cocido' check (porcion_es in ('cocido', 'limpio')),
+  nota           text
+);
+
 create table insumos (
   id           bigint generated always as identity primary key,
   nombre       text not null unique,
@@ -89,6 +104,8 @@ create table insumos (
   pack_nombre  text,                                -- bolsa, botella, docena
   proveedor_id bigint references proveedores(id) on delete set null,
   vence        date,
+  rinde_coccion numeric(6,3) not null default 1 check (rinde_coccion > 0 and rinde_coccion <= 6),  -- cocido / limpio: 0,70 la carne, 2,6 el arroz
+  referencia_id bigint references referencias(id) on delete set null,
   activo       boolean not null default true
 );
 create index insumos_proveedor_idx on insumos (proveedor_id);
@@ -96,7 +113,8 @@ create index insumos_proveedor_idx on insumos (proveedor_id);
 create table receta_items (
   producto_id bigint not null references productos(id) on delete cascade,
   insumo_id   bigint not null references insumos(id) on delete restrict,
-  cantidad    numeric(14,4) not null check (cantidad > 0),   -- limpia, por porción, en la unidad del insumo
+  cantidad    numeric(14,4) not null check (cantidad > 0),   -- por porción, en la unidad del insumo
+  cocido      boolean not null default false,                 -- true: la cantidad es como sale al plato (ya cocido)
   primary key (producto_id, insumo_id)
 );
 create index receta_insumo_idx on receta_items (insumo_id);
@@ -369,6 +387,10 @@ create policy medios_gestion      on medios_pago for all using ((select es_gesti
 create policy mesas_gestion       on mesas       for all using ((select es_gestion())) with check ((select es_gestion()));
 -- Abrir mesas, cargar y confirmar pedidos, avanzar comandas, atender llamados y cobrar se hace con las
 -- funciones de 0002: así los precios salen siempre de la carta y cada rol hace solo lo suyo.
+
+alter table referencias enable row level security;
+create policy referencias_leer    on referencias for select using ((select es_personal()));
+create policy referencias_gestion on referencias for all using ((select es_gestion())) with check ((select es_gestion()));
 
 alter table perfiles enable row level security;
 create policy perfiles_leer  on perfiles for select using (id = (select auth.uid()) or (select es_gestion()));

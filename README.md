@@ -11,6 +11,7 @@ supabase/migrations/
   20261029000002_operacion.sql    salón, comandas, caja, compras, mermas, inventarios, recetas y plata (todo por funciones)
   20261029000003_tableros.sql     tableros con filtros, previsión de compras y control de inventario
   20261029000004_qr_y_ayudante.sql carta pública por QR, sugerencias y contexto de Chichito, permisos de funciones
+  20261112000005_referencias.sql  tabla de referencia: limpieza, rinde de cocción y porción típica
 supabase/functions/
   usuarios/                       invitar usuarios por mail (necesita la clave de servicio)
   ia/                             leer facturas (foto o PDF) y responder preguntas a Chichito con la API de Claude
@@ -35,8 +36,10 @@ ni tickets aunque lo intente desde afuera de la app, y el QR solo puede usar tre
 ## Cómo calcula
 
 - **Jornada**: lo vendido antes de las 6 AM cuenta para la noche anterior (parámetro `corte_jornada`).
-- **Costo de un plato** = Σ receta × cantidad limpia ÷ (1 − merma de limpieza) × costo del artículo.
-  La merma de limpieza se mide con las pruebas de rendimiento.
+- **Costo de un plato** = Σ cantidad a comprar × costo del artículo. Cada ingrediente de la receta se carga "al plato"
+  (cocido: 0,30 kg de vacío) o "limpio crudo" (60 ml de gin). A comprar = cantidad ÷ rinde de cocción (si es al plato)
+  ÷ (1 − merma de limpieza). Merma y rinde salen de la **tabla de referencia** (83 artículos de cocina y barra,
+  valores aproximados para arrancar) y se corrigen con las pruebas de rendimiento propias.
 - **Al cobrar** se descuentan del stock los artículos de cada plato y queda guardado el costo del ticket.
 - **Control semanal**: entre dos inventarios completos, `inicial + compras − final − uso según ventas − mermas registradas`
   = lo que falta sin explicación, en kilos y en plata.

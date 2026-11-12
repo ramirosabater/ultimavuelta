@@ -110,3 +110,7 @@ from (values
 ) as x(prod, ins, cant)
 join productos p on p.nombre = x.prod join insumos i on i.nombre = x.ins
 on conflict do nothing;
+
+-- Los artículos de ejemplo toman el rinde de cocción de la tabla de referencia (cuando el nombre coincide)
+update insumos i set referencia_id = r.id, rinde_coccion = r.rinde_coccion
+from referencias r where lower(r.nombre) = lower(i.nombre) and i.referencia_id is null;
