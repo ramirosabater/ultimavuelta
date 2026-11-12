@@ -53,7 +53,7 @@ button.link { border: 0; background: none; color: var(--accent); text-decoration
 /* Ingreso */
 .ingreso { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--hdr); }
 .ingreso .card { width: min(400px, 100%); background: var(--surface); color: var(--fg); border-radius: 16px; padding: 26px 24px; box-shadow: 0 20px 50px rgb(0 0 0 / .35); }
-.ingreso .card img { width: 86px; height: 86px; border-radius: 50%; box-shadow: 0 0 0 3px var(--gold); margin-bottom: 10px; }
+.ingreso .card img { width: 96px; height: 96px; border-radius: 50%; box-shadow: 0 6px 16px rgb(0 0 0 / .3); margin-bottom: 10px; }
 .ingreso h1 { font-size: 30px; text-transform: uppercase; }
 
 /* Tarjetas de producto en el pedido */
