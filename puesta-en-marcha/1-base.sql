@@ -462,6 +462,19 @@ language sql stable set search_path = public as $$ select jornada_de(now()) $$;
 create or replace function hoy_local() returns date
 language sql stable set search_path = public as $$ select (now() at time zone zona())::date $$;
 
+-- La jornada a la que va lo que se cobra ahora: la actual, salvo que su caja ya esté cerrada.
+-- Entonces pasa a la siguiente (y así, si esa también se abrió y cerró antes de tiempo).
+create or replace function jornada_caja() returns date
+language plpgsql stable security definer set search_path = public as $$
+declare v_j date := jornada_actual();
+begin
+  for i in 1..7 loop
+    exit when not exists (select 1 from jornadas where fecha = v_j and cerrada_en is not null);
+    v_j := v_j + 1;
+  end loop;
+  return v_j;
+end $$;
+
 -- Cantidad a comprar para tener p_limpio después de limpiar (merma de limpieza)
 create or replace function bruto(p_limpio numeric, p_merma numeric) returns numeric
 language sql immutable as $$ select p_limpio / (1 - least(coalesce(p_merma, 0), 90) / 100.0) $$;
@@ -645,7 +658,7 @@ end $$;
 create or replace function cobrar_mesa(p_mesa bigint, p_medio text, p_descuento numeric default 0) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
-  m mesas; v_t bigint; v_sub numeric; v_tot numeric; v_j date := jornada_actual(); r record;
+  m mesas; v_t bigint; v_sub numeric; v_tot numeric; v_j date := jornada_caja(); r record;
 begin
   perform exigir(es_salon(), 'Tu usuario no puede cobrar.');
   select * into m from mesas where id = p_mesa for update;
@@ -716,7 +729,7 @@ $$;
 
 create or replace function abrir_caja(p_monto numeric) returns void
 language plpgsql security definer set search_path = public as $$
-declare v_j date := jornada_actual();
+declare v_j date := jornada_caja();
 begin
   perform exigir(es_gestion(), 'Solo dueños y encargados abren la caja.');
   perform exigir(coalesce(p_monto, -1) >= 0, 'Cargá el efectivo inicial (puede ser 0).');
@@ -727,7 +740,7 @@ end $$;
 
 create or replace function registrar_gasto_caja(p_concepto text, p_monto numeric) returns void
 language plpgsql security definer set search_path = public as $$
-declare v_j date := jornada_actual(); v_c bigint := cuenta_efectivo();
+declare v_j date := jornada_caja(); v_c bigint := cuenta_efectivo();
 begin
   perform exigir(es_gestion(), 'Solo dueños y encargados sacan plata de la caja.');
   perform exigir(length(trim(coalesce(p_concepto, ''))) > 0 and coalesce(p_monto, 0) > 0, 'Completá concepto y monto.');
@@ -747,7 +760,7 @@ $$;
 
 create or replace function cerrar_caja(p_contado numeric) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_j date := jornada_actual(); v_e numeric;
+declare v_j date := jornada_caja(); v_e numeric;
 begin
   perform exigir(es_gestion(), 'Solo dueños y encargados cierran la caja.');
   perform exigir(coalesce(p_contado, -1) >= 0, 'Cargá el efectivo contado.');

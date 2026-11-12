@@ -108,6 +108,16 @@ select cargar_pedido((select id from mesas where numero = 2), jsonb_build_array(
 select cobrar_mesa((select id from mesas where numero = 2), 'Débito')->>'total';
 select cobrar_mesa((select id from mesas where numero = 4), 'Transferencia / QR')->>'total';
 select pg_temp.como(:'ADMIN');
+-- La caja de hoy ya se cerró: estos dos cobros tienen que ir a la jornada siguiente y el cierre no se toca
+do $$ begin
+  if (select count(*) from tickets where mesa_numero in (2, 4) and jornada = jornada_actual() + 1) <> 2
+     or exists (select 1 from tickets where mesa_numero in (2, 4) and jornada = jornada_actual())
+     or jornada_caja() <> jornada_actual() + 1 then
+    raise exception 'Los cobros con la caja cerrada no pasaron a la jornada siguiente';
+  end if;
+end $$;
+select format('   cobros con la caja cerrada → jornada %s (la de hoy %s quedó cerrada con %s)', jornada_caja(), jornada_actual(),
+              (select count(*) from tickets where jornada = jornada_actual()));
 select '   inventario ' || guardar_inventario((select jsonb_agg(jsonb_build_object('insumo_id', id,
           'cantidad', case when nombre = 'Vacío' then cantidad - 1.2 else cantidad end)) from insumos));
 select format('   control: %s %s sin explicar (%s)', nombre, sin_explicar, plata)

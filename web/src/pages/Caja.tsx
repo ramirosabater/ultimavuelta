@@ -10,7 +10,10 @@ import { Cabeza, Modal, Pill, Stat, useAccion } from '../components/ui'
 type Ventana = null | 'abrir' | 'gasto' | 'cerrar' | { cobrar: Mesa }
 
 export default function Caja() {
-  const j = jornada()
+  const [ver, setVer] = useState<string | null>(null)
+  const hoyJ = jornada(), j = ver ?? hoyJ
+  // Adónde van los cobros de ahora: la jornada actual, o la siguiente si su caja ya se cerró
+  const destino = useConsulta(() => rpc<string>('jornada_caja'))
   const { datos, recargar, error } = useConsulta(async () => {
     const [jor, tickets, gastos, mesas, pedidos, medios, cuentas, esperado] = await Promise.all([
       tabla<Jornada[]>(supabase.from('jornadas').select('*').eq('fecha', j)),
@@ -23,7 +26,7 @@ export default function Caja() {
       rpc<number>('efectivo_esperado', { p_jornada: j }),
     ])
     return { jor: jor[0] ?? null, tickets, gastos, mesas, pedidos, medios, cuentas, esperado: Number(esperado) }
-  })
+  }, [j])
   useEnVivo(['mesas', 'pedidos'], recargar, 30)
   const [ventana, setVentana] = useState<Ventana>(null)
 
@@ -43,7 +46,8 @@ export default function Caja() {
     ...tickets.map((t) => ({ h: t.hora, txt: `Mesa ${t.mesa_numero ?? '—'} · ${(t.ticket_items ?? []).reduce((s, i) => s + i.cantidad, 0)} ítems`, med: t.medio + (Number(t.descuento_pct) ? ` · ${t.descuento_pct}% desc.` : ''), m: Number(t.total) })),
     ...gastos.map((g) => ({ h: g.creado, txt: `Gasto: ${g.concepto}`, med: 'Efectivo', m: -Number(g.monto) })),
   ].sort((a, b) => (a.h < b.h ? 1 : -1))
-  const listo = () => { setVentana(null); recargar() }
+  const listo = () => { setVentana(null); recargar(); destino.recargar() }
+  const jc = destino.datos
 
   return <>
     <Cabeza etiqueta={`Jornada ${fecha(j)}`} titulo="Caja">
@@ -56,6 +60,11 @@ export default function Caja() {
       <Stat label="Efectivo" valor={plata(efectivo)} /><Stat label="Gastos de caja" valor={plata(egresos)} />
       <Stat label="Debería haber en caja" valor={abierta ? plata(esperado) : '—'} />
     </div>
+    {cerrada && jc && jc !== j && <div className="alert" style={{ marginBottom: 16 }}><Pill tono="warn">Caja cerrada</Pill>
+      <span className="grow">Lo que se cobre ahora va a la jornada del <b>{fecha(jc)}</b>.</span>
+      <button className="btn sm" onClick={() => setVer(jc)}>Ver esa jornada</button></div>}
+    {j !== hoyJ && <div className="alert" style={{ marginBottom: 16 }}><span className="grow">Estás viendo la jornada del <b>{fecha(j)}</b>.</span>
+      <button className="btn sm ghost" onClick={() => setVer(null)}>Volver a la de hoy</button></div>}
     {cerrada && (() => { const dif = Number(jor!.cierre_contado) - Number(jor!.cierre_esperado); return <div className="alert" style={{ background: dif === 0 ? 'var(--ok-soft)' : 'var(--warn-soft)', marginBottom: 16 }}>
       <span className="grow">Cierre: contado <b className="mono">{plata(jor!.cierre_contado)}</b>, esperado <span className="mono">{plata(jor!.cierre_esperado)}</span>. Diferencia <b className="mono">{dif > 0 ? '+' : ''}{plata(dif)}</b></span></div> })()}
     {!abierta && <div className="alert" style={{ marginBottom: 16 }}><span className="grow">La caja de hoy no está abierta. Abrila con el efectivo inicial para que el cierre dé justo.</span></div>}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { rpc, tabla, useConsulta } from '../lib/datos'
 import { supabase } from '../lib/supabase'
-import { plata } from '../lib/formato'
+import { fecha, jornada, plata } from '../lib/formato'
 import type { Categoria, MedioPago, Mesa, PedidoItem, Producto } from '../lib/tipos'
 import { Modal, useAccion } from './ui'
 
@@ -93,6 +93,7 @@ export function CargarPedido({ mesa, onCerrar, onListo }: { mesa: Mesa; onCerrar
 /** Cobrar una mesa: medio de pago, descuento y cuánto paga cada uno */
 export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: Pick<PedidoItem, 'cantidad' | 'nombre' | 'nota' | 'precio'>[]; onCerrar: () => void; onListo: () => void }) {
   const medios = useConsulta(() => tabla<MedioPago[]>(supabase.from('medios_pago').select('*').eq('activo', true).order('orden')))
+  const destino = useConsulta(() => rpc<string>('jornada_caja'))
   const [medio, setMedio] = useState('')
   const [desc, setDesc] = useState('0')
   const [div, setDiv] = useState('1')
@@ -111,6 +112,7 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
       <button className="btn pri" disabled={ocupado || !elegido} onClick={async () => {
         if (await correr(() => rpc('cobrar_mesa', { p_mesa: mesa.id, p_medio: elegido, p_descuento: d }), `Cobrado ${plata(total)} · ${elegido}`)) onListo()
       }}>Confirmar cobro</button></>}>
+    {destino.datos && destino.datos !== jornada() && <div className="notice">La caja de hoy ya está cerrada: este cobro va a la jornada del <b>{fecha(destino.datos)}</b>.</div>}
     <Items items={agrupados} />
     <div className="total-row" style={{ borderTopWidth: 1 }}><span className="label">Subtotal</span><span className="num" style={{ fontSize: 16 }}>{plata(sub)}</span></div>
     <div className="two">
