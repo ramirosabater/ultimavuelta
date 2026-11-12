@@ -31,8 +31,11 @@ export interface RecetaItem { producto_id: number; insumo_id: number; cantidad: 
 export interface Mesa {
   id: number; numero: number; zona: string | null; activa: boolean; token: string; estado: EstadoMesa
   abierta: string | null; comensales: number | null; mozo_id: string | null
+  tipo: TipoCuenta; nombre: string | null; telefono: string | null; direccion: string | null; temporal: boolean
 }
-export interface PedidoItem { id: number; pedido_id: number; producto_id: number | null; nombre: string; cantidad: number; precio: number; estacion: Estacion; nota: string | null }
+/** mesa: una mesa del salón · el resto: cuentas sin mesa (se apagan al cobrarlas) */
+export type TipoCuenta = 'mesa' | 'llevar' | 'delivery' | 'barra' | 'aparte'
+export interface PedidoItem { id: number; pedido_id: number; producto_id: number | null; nombre: string; cantidad: number; precio: number; estacion: Estacion; nota: string | null; cortesia?: boolean }
 export interface Pedido {
   id: number; mesa_id: number; origen: 'mozo' | 'qr'; confirmado: boolean; creado: string; mozo_id: string | null
   est_cocina: EstadoComanda | null; est_barra: EstadoComanda | null; t_cocina_listo: string | null; t_barra_listo: string | null
@@ -49,6 +52,7 @@ export interface Jornada {
 export interface Ticket {
   id: number; jornada: string; hora: string; mesa_numero: number | null; comensales: number | null; mozo_nombre: string | null
   subtotal: number; descuento_pct: number; total: number; medio: string; costo: number; sin_factura: boolean
+  propina?: number; mesa_nombre?: string | null
   ticket_items?: { nombre: string; cantidad: number; precio: number }[]
 }
 export interface Gasto {

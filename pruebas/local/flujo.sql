@@ -226,5 +226,50 @@ do $$ begin if exists (select 1 from gastos where concepto = 'Compra: Vacío' an
 do $$ begin if exists (select 1 from compras c where not exists (select 1 from movimientos_stock m where m.compra_id = c.id)) then raise exception 'Quedó una compra vacía'; end if; end $$;
 select case when (select coalesce(sum(saldo_cuenta(id)), 0) from cuentas where activa) = :saldo0 then '   la plata de la cuenta volvió' else 'ERROR: el saldo no volvió' end;
 select pg_temp.debe_fallar(format('select anular_compra(%s)', :cmal), 'No encontramos');
+
+\echo '12. Pedidos: sin mesa, sacar, invitar, pasar, cobrar con dos medios y propina'
+select pg_temp.como(:'MOZO');
+select abrir_cuenta('llevar', 'Juan', '297 455-1234') as llevar \gset
+select pg_temp.debe_fallar($$select abrir_cuenta('delivery', 'Ana')$$, 'dirección');
+select cargar_pedido(:llevar, jsonb_build_array(
+  jsonb_build_object('producto_id', (select id from productos where nombre = 'Vacío'), 'cantidad', 2),
+  jsonb_build_object('producto_id', (select id from productos where nombre = 'Fernet con cola'), 'cantidad', 3))) as ped \gset
+select (select id from pedido_items where pedido_id = :ped and nombre = 'Fernet con cola') as fernet, (select id from pedido_items where pedido_id = :ped and nombre = 'Vacío') as vacio \gset
+select pg_temp.debe_fallar(format('select sacar_item(%s, 1, null)', :fernet), 'por qué');
+select sacar_item(:fernet, 1, 'Pidió uno de más');
+select avanzar_comanda(:ped, 'cocina', 'preparando');
+select pg_temp.debe_fallar(format('select sacar_item(%s, 1, %L)', :vacio, 'Se arrepintió'), 'encargado');
+select pg_temp.debe_fallar(format('select invitar_item(%s, 1, %L)', :fernet, 'Cumpleaños'), 'dueños o el encargado');
+select pg_temp.como(:'ADMIN');
+select invitar_item(:fernet, 1, 'Cliente de siempre');
+select format('   %s: %s', nombre_mesa(m), (select string_agg(i.cantidad || '× ' || i.nombre || ' $' || i.precio::int, ', ' order by i.id) from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = m.id and p.ticket_id is null))
+from mesas m where id = :llevar;
+-- separar: un vacío a una cuenta aparte
+select pg_temp.como(:'MOZO');
+select abrir_cuenta('aparte', 'Juan · Pedro') as aparte \gset
+select pasar_items(jsonb_build_array(jsonb_build_object('id', :vacio, 'cantidad', 1)), :aparte);
+select format('   pasado: quedan %s vacío en Juan y %s en Pedro', (select sum(i.cantidad) from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = :llevar and i.nombre = 'Vacío'),
+              (select sum(i.cantidad) from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = :aparte and i.nombre = 'Vacío'));
+select (select est_cocina from pedidos where mesa_id = :aparte and ticket_id is null) = 'preparando' as conserva_estado \gset
+\if :conserva_estado
+\else
+  select 1/0 as la_comanda_pasada_perdio_su_estado;
+\endif
+select coalesce(sum(i.cantidad * i.precio), 0) as tot_llevar from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = :llevar and p.ticket_id is null \gset
+select pg_temp.debe_fallar(format($$select cobrar_mesa(%s, 'Efectivo', 0, '[{"medio":"Efectivo","monto":1000},{"medio":"Débito","monto":1000}]', 0)$$, :llevar), 'Los pagos suman');
+select efectivo_esperado(jornada_caja()) as caja_antes \gset
+select '   cobro: ' || cobrar_mesa(:llevar, 'Efectivo', 0, jsonb_build_array(jsonb_build_object('medio', 'Efectivo', 'monto', 10000), jsonb_build_object('medio', 'Débito', 'monto', :tot_llevar + 2000 - 10000)), 2000)::text;
+select pg_temp.como(:'ADMIN');
+select format('   ticket %s · total %s + propina %s · pagos: %s', t.mesa_nombre, t.total, t.propina, (select string_agg(medio || ' ' || monto, ', ' order by medio) from ticket_pagos where ticket_id = t.id))
+from tickets t where t.mesa_nombre like 'Para llevar%' order by id desc limit 1;
+select case when efectivo_esperado(jornada_caja()) = :caja_antes + 10000 then '   la caja suma el efectivo del pago mixto' else 'ERROR caja' end;
+select (select activa from mesas where id = :llevar) as sigue_activa \gset
+\if :sigue_activa
+  select 1/0 as la_cuenta_para_llevar_no_se_apago;
+\endif
+select '   cambios anotados: ' || string_agg(tipo || ' ' || cantidad || '× ' || nombre || coalesce(' (' || motivo || ')', ''), ' · ' order by id) from pedido_cambios;
+select '   ventas por medio: ' || (tablero_ventas(jornada_actual() - 30, jornada_actual() + 1)->'medios')::text;
+select sacar_item((select i.id from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = :aparte and p.ticket_id is null limit 1), null, 'Se fue sin comer');
+select case when (select activa from mesas where id = :aparte) then 'ERROR: la cuenta aparte vacía sigue abierta' else '   la cuenta aparte vacía se cerró sola' end;
 reset role;
 \echo 'TODO BIEN'

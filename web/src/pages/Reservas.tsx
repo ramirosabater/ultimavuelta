@@ -23,7 +23,7 @@ export default function Reservas() {
       tabla<Reserva[]>(supabase.from('reservas').select('*').eq('fecha', dia).order('hora').order('creado')),
       tabla<Reserva[]>(supabase.from('reservas').select('*').eq('estado', 'pendiente').gte('fecha', hoy).order('fecha').order('hora')),
       tabla<Pick<Reserva, 'fecha' | 'personas'>[]>(supabase.from('reservas').select('fecha, personas').in('estado', ['pendiente', 'confirmada']).gte('fecha', hoy).lte('fecha', sumarDias(hoy, 20))),
-      tabla<Mesa[]>(supabase.from('mesas').select('*').eq('activa', true).order('numero')),
+      tabla<Mesa[]>(supabase.from('mesas').select('*').eq('activa', true).eq('temporal', false).order('numero')),
       leerParametros(),
     ])
     return { delDia, pendientes, proximas, mesas, p }

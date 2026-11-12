@@ -48,6 +48,26 @@
   "texto": "Los avisos. Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar."
  },
  {
+  "id": "c49df2e2",
+  "texto": "Pedido sin mesa. Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a parrilla y barra como cualquier mesa."
+ },
+ {
+  "id": "485dbf10",
+  "texto": "Arriba de las mesas. Las cuentas sin mesa aparecen arriba, con el nombre. Se cobran igual y al cobrarlas desaparecen."
+ },
+ {
+  "id": "37a00fbc",
+  "texto": "Abrí la mesa. Tocá la mesa. En cada producto ya enviado hay tres puntitos: para sacarlo, invitarlo o pasarlo a otra mesa. Queda anotado con el motivo."
+ },
+ {
+  "id": "7a3abfd9",
+  "texto": "Separar la cuenta. Si alguien paga lo suyo, tocá Separar o pasar productos, elegí lo que consumió y mandalo a una cuenta aparte. Después cobrás cada una por separado."
+ },
+ {
+  "id": "774a5a25",
+  "texto": "Dos medios y propina. Al cobrar podés sumar la propina y, si pagan con dos medios, tocar Paga con más de un medio. La caja cuenta cada parte donde va."
+ },
+ {
   "id": "7f51a8c8",
   "texto": "El link para clientes. Compartí este link en Instagram y WhatsApp, o imprimí el QR. El cliente elige día, horario y cuántos son, y te llega acá."
  },

@@ -6,14 +6,14 @@
 --
 --   Se pega una vez en Supabase → SQL Editor → Run.
 --   Para sacar todo: 6-borrar-datos-de-prueba.sql (deja la base como estaba antes).
---   Antes tienen que estar pegadas las actualizaciones 01 a 04.
+--   Antes tienen que estar pegadas las actualizaciones 01 a 05.
 -- =====================================================================
 
 do $$ begin
   if to_regclass('public.reservas') is null or to_regclass('public.facturas') is null
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tickets' and column_name = 'sin_factura')
-     or to_regprocedure('public.anular_compra(bigint)') is null then
-    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01, 02, 03 y 04 (carpeta actualizaciones).';
+     or to_regprocedure('public.anular_compra(bigint)') is null or to_regclass('public.ticket_pagos') is null then
+    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 05 (carpeta actualizaciones).';
   end if;
   if to_regclass('public.datos_prueba') is not null then
     raise exception 'Los datos de prueba ya están cargados. Para cargarlos de nuevo, primero corré 6-borrar-datos-de-prueba.sql.';
@@ -467,6 +467,33 @@ begin
     select t, p.id, p.nombre, c.nombre, sum(i.cantidad), p.precio, coalesce(costo_receta(p.id), 0)
     from items_t i join productos p on p.id = i.producto_id join categorias c on c.id = p.categoria_id group by p.id, p.nombre, c.nombre, p.precio;
     update tickets set costo = (select coalesce(sum(cantidad * costo_unit), 0) from ticket_items where ticket_id = t) where id = t;
+  end loop;
+
+  -- Una de las de hoy se pagó con dos medios y dejó propina
+  select max(id::bigint) into t from datos_prueba where tabla = 'tickets';
+  select total into v_tot from tickets where id = t::bigint;
+  if v_caja is not null and exists (select 1 from medios_pago where nombre = 'Débito' and activo) and exists (select 1 from medios_pago where nombre = 'Efectivo' and activo) then
+    update tickets set propina = round(v_tot * 0.1 / 100) * 100, medio = 'Débito' where id = t;
+    insert into ticket_pagos (ticket_id, medio, monto) values (t, 'Efectivo', 20000), (t, 'Débito', v_tot + round(v_tot * 0.1 / 100) * 100 - 20000);
+  end if;
+  -- Correcciones de la noche (para la lista de la Caja)
+  insert into pedido_cambios (hora, jornada, mesa, tipo, nombre, cantidad, importe, motivo, usuario_id, usuario) values
+    (now() - interval '40 minutes', v_hoy, 'Mesa 10', 'sacado', 'Papas fritas', 1, (select precio from productos where nombre = 'Papas fritas'), 'Se equivocó al pedir', v_mozos[1], (select nombre from perfiles where id = v_mozos[1])),
+    (now() - interval '30 minutes', v_hoy, 'Mesa 11', 'invitado', 'Flan mixto', 1, (select precio from productos where nombre = 'Flan mixto'), 'Demoró la cocina', coalesce(v_enc, v_admin), (select nombre from perfiles where id = coalesce(v_enc, v_admin)));
+  for v_c in select id from pedido_cambios where jornada = v_hoy and hora > now() - interval '1 hour' loop insert into datos_prueba values ('pedido_cambios', v_c::text) on conflict do nothing; end loop;
+
+  -- Pedidos sin mesa en curso: uno para llevar y un delivery
+  for r in select * from (values ('llevar', 'Romina', '2974112233', null, 12, 'preparando'), ('delivery', 'Hugo', '2974998877', 'Av. Moyano 1450', 22, 'listo')) v(tipo, nombre, tel, dir, minutos, cocina) loop
+    insert into mesas (numero, tipo, nombre, telefono, direccion, temporal, activa, estado, abierta, mozo_id)
+    values ((select greatest(1000, max(numero) + 1) from mesas), r.tipo, r.nombre, r.tel, r.dir, true, true, 'ocupada', now() - (r.minutos + 3) * interval '1 minute', v_mozos[1])
+    returning id into v_p;
+    insert into datos_prueba values ('mesas_nuevas', v_p::text);
+    insert into pedidos (mesa_id, origen, confirmado, creado, confirmado_en, mozo_id, est_cocina, t_cocina_listo)
+    values (v_p, 'mozo', true, now() - r.minutos * interval '1 minute', now() - r.minutos * interval '1 minute', v_mozos[1], r.cocina::estado_comanda,
+            case when r.cocina = 'listo' then now() - 2 * interval '1 minute' end) returning id into v_c;
+    insert into datos_prueba values ('pedidos', v_c::text);
+    insert into pedido_items (pedido_id, producto_id, nombre, cantidad, precio, estacion)
+    select v_c, producto_id, nombre, 1 + floor(random() * 2)::int, precio, estacion from pesos where grupo in ('plato', 'guarni') order by -ln(1 - random()) / peso limit 3;
   end loop;
 
   -- Mesas en curso: cada una muestra un estado distinto en Mesas y en Comandas

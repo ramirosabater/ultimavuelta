@@ -6,14 +6,14 @@
 --
 --   Se pega una vez en Supabase → SQL Editor → Run.
 --   Para sacar todo: 6-borrar-datos-de-prueba.sql (deja la base como estaba antes).
---   Antes tienen que estar pegadas las actualizaciones 01 a 04.
+--   Antes tienen que estar pegadas las actualizaciones 01 a 05.
 -- =====================================================================
 
 do $$ begin
   if to_regclass('public.reservas') is null or to_regclass('public.facturas') is null
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tickets' and column_name = 'sin_factura')
-     or to_regprocedure('public.anular_compra(bigint)') is null then
-    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01, 02, 03 y 04 (carpeta actualizaciones).';
+     or to_regprocedure('public.anular_compra(bigint)') is null or to_regclass('public.ticket_pagos') is null then
+    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 05 (carpeta actualizaciones).';
   end if;
   if to_regclass('public.datos_prueba') is not null then
     raise exception 'Los datos de prueba ya están cargados. Para cargarlos de nuevo, primero corré 6-borrar-datos-de-prueba.sql.';

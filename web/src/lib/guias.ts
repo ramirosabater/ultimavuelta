@@ -21,6 +21,15 @@ export const CIRCUITOS: Circuito[] = [
     { ir: '/mesas', foco: 'panel-mesa', titulo: 'Cargá el pedido', texto: 'Tocá los productos, agregá aclaraciones si hace falta y mandá. La parrilla y la barra lo reciben al instante.' },
     { ir: '/mesas', foco: 'avisos', titulo: 'Los avisos', texto: 'Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar.' },
   ] },
+  { id: 'sin-mesa', titulo: 'Para llevar, delivery o barra', area: 'mesas', roles: SALON, pasos: [
+    { ir: '/mesas', foco: 'sin-mesa', titulo: 'Pedido sin mesa', texto: 'Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a parrilla y barra como cualquier mesa.' },
+    { ir: '/mesas', foco: 'mesas', titulo: 'Arriba de las mesas', texto: 'Las cuentas sin mesa aparecen arriba, con el nombre. Se cobran igual y al cobrarlas desaparecen.' },
+  ] },
+  { id: 'corregir', titulo: 'Corregir un pedido o separar la cuenta', area: 'mesas', roles: SALON, pasos: [
+    { ir: '/mesas', foco: 'mesas', titulo: 'Abrí la mesa', texto: 'Tocá la mesa. En cada producto ya enviado hay tres puntitos: para sacarlo, invitarlo o pasarlo a otra mesa. Queda anotado con el motivo.' },
+    { ir: '/mesas', foco: 'mesas', titulo: 'Separar la cuenta', texto: 'Si alguien paga lo suyo, tocá Separar o pasar productos, elegí lo que consumió y mandalo a una cuenta aparte. Después cobrás cada una por separado.' },
+    { ir: '/caja', foco: 'por-cobrar', titulo: 'Dos medios y propina', texto: 'Al cobrar podés sumar la propina y, si pagan con dos medios, tocar Paga con más de un medio. La caja cuenta cada parte donde va.' },
+  ] },
   { id: 'reservas', titulo: 'Tomar y confirmar reservas', area: 'reservas', roles: G, pasos: [
     { ir: '/reservas', foco: 'link-reservas', titulo: 'El link para clientes', texto: 'Compartí este link en Instagram y WhatsApp, o imprimí el QR. El cliente elige día, horario y cuántos son, y te llega acá.' },
     { ir: '/reservas', foco: 'nueva-reserva', titulo: 'Las que te piden por teléfono', texto: 'Si te reservan por teléfono o en el local, cargalas acá: entran confirmadas.' },

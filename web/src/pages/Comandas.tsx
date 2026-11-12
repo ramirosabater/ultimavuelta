@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { leerParametros, rpc, tabla, useConsulta, useEnVivo } from '../lib/datos'
 import { supabase } from '../lib/supabase'
 import { hhmm, minutosDesde } from '../lib/formato'
+import { etiquetaMesa } from '../lib/mesas'
 import type { EstadoComanda, Estacion, Mesa, Pedido } from '../lib/tipos'
 import { Items } from '../components/salon'
 import { AutoVacio } from '../components/Autos'
@@ -20,11 +21,11 @@ export default function Comandas({ estacion }: { estacion: Estacion }) {
     const [pedidos, mesas, par] = await Promise.all([
       tabla<Pedido[]>(supabase.from('pedidos').select('*, pedido_items(*)').is('ticket_id', null).eq('confirmado', true)
         .in(campo, ['pendiente', 'preparando', 'listo']).order('creado')),
-      tabla<Mesa[]>(supabase.from('mesas').select('id, numero')),
+      tabla<Mesa[]>(supabase.from('mesas').select('id, numero, tipo, nombre')),
       leerParametros(),
     ])
     const lim = (par[estacion === 'cocina' ? 'alerta_cocina' : 'alerta_barra'] ?? (estacion === 'cocina' ? '15,25' : '5,10')).split(',').map(Number)
-    return { pedidos, mesas: new Map(mesas.map((m) => [m.id, m.numero])), lim }
+    return { pedidos, mesas: new Map(mesas.map((m) => [m.id, etiquetaMesa(m)])), lim }
   }, [estacion])
   useEnVivo(['pedidos', 'pedido_items'], recargar, 15)
   // El reloj de cada comanda se actualiza solo
@@ -48,7 +49,7 @@ export default function Comandas({ estacion }: { estacion: Estacion }) {
           const mm = minutosDesde(p.creado)
           const nivel = c.estado === 'listo' ? '' : mm >= rojo ? 'crit' : mm >= amarillo ? 'warn' : ''
           return <article key={p.id} className={`ticket${nivel ? ` t-${nivel}` : ''}`}>
-            <div className="th"><b>Mesa {datos.mesas.get(p.mesa_id)}</b><Pill tono={nivel as '' | 'warn' | 'crit'}>{hhmm(p.creado)} · {mm} min</Pill></div>
+            <div className="th"><b>{datos.mesas.get(p.mesa_id) ?? 'Mesa'}</b><Pill tono={nivel as '' | 'warn' | 'crit'}>{hhmm(p.creado)} · {mm} min</Pill></div>
             <Items items={(p.pedido_items ?? []).filter((i) => i.estacion === estacion)} precios={false} />
             <button className={`btn${c.estado === 'listo' ? '' : ' pri'}`} disabled={ocupado}
               onClick={async () => { if (await correr(() => rpc('avanzar_comanda', { p_pedido: p.id, p_estacion: estacion, p_estado: c.sigue }))) recargar() }}>{c.boton}</button>

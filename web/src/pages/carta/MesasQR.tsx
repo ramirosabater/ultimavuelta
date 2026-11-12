@@ -17,7 +17,7 @@ function QR({ texto, tam = 180 }: { texto: string; tam?: number }) {
 
 export default function MesasQR() {
   const d = useConsulta(async () => {
-    const [mesas, p] = await Promise.all([tabla<Mesa[]>(supabase.from('mesas').select('*').order('numero')), leerParametros()])
+    const [mesas, p] = await Promise.all([tabla<Mesa[]>(supabase.from('mesas').select('*').eq('temporal', false).order('numero')), leerParametros()])
     return { mesas, local: p.nombre_local || NOMBRE }
   })
   const [ventana, setVentana] = useState<Mesa | null | 'nueva'>(null)

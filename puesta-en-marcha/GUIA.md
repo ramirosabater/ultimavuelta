@@ -72,9 +72,10 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | `02-facturacion.sql` | Factura electrónica con ARCA (después, publicar la función `arca`: ver abajo) |
 | `03-sin-factura.sql` | Cobrar sin factura: la venta queda marcada y no aparece como pendiente |
 | `04-anular-compra.sql` | Compras: cargar a mano con varios artículos y anular una compra mal cargada |
+| `05-pedidos.sql` | Pedidos: para llevar, delivery y barra; sacar, invitar o pasar productos; separar la cuenta; cobrar con varios medios y propina |
 
 ## Datos de prueba (para mostrar la app)
-- `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de ejemplo. Antes tienen que estar pegadas las actualizaciones 01 a 04.
+- `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de ejemplo. Antes tienen que estar pegadas las actualizaciones 01 a 05.
 - `6-borrar-datos-de-prueba.sql`: saca todo eso y deja la base como estaba. Correlo antes de empezar a usar la app de verdad.
 
 ## Factura electrónica (ARCA)

@@ -27,6 +27,9 @@ begin
   delete from llamados l using datos_prueba d where d.tabla = 'llamados' and d.id = l.mesa_id::text;
   delete from pedidos p using datos_prueba d where d.tabla = 'pedidos' and d.id = p.id::text;
   delete from pedidos p using datos_prueba d where d.tabla = 'tickets' and d.id = p.ticket_id::text;
+  delete from pedidos p using datos_prueba d where d.tabla = 'mesas_nuevas' and d.id = p.mesa_id::text;
+  delete from mesas m using datos_prueba d where d.tabla = 'mesas_nuevas' and d.id = m.id::text;
+  delete from pedido_cambios c using datos_prueba d where d.tabla = 'pedido_cambios' and d.id = c.id::text;
   update mesas m set estado = (a.datos->>'estado')::estado_mesa, abierta = (a.datos->>'abierta')::timestamptz,
                      comensales = (a.datos->>'comensales')::int, mozo_id = (a.datos->>'mozo_id')::uuid
   from datos_prueba d join datos_prueba_antes a on a.tabla = 'mesas' and a.id = d.id
