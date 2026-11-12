@@ -71,6 +71,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | `01-reservas.sql` | Reservas: página pública para clientes, cupo por horario, confirmar por WhatsApp y sentar en una mesa |
 | `02-facturacion.sql` | Factura electrónica con ARCA (después, publicar la función `arca`: ver abajo) |
 | `03-sin-factura.sql` | Cobrar sin factura: la venta queda marcada y no aparece como pendiente |
+| `04-anular-compra.sql` | Compras: cargar a mano con varios artículos y anular una compra mal cargada |
 
 ## Factura electrónica (ARCA)
 

@@ -43,6 +43,10 @@ export const CIRCUITOS: Circuito[] = [
   { id: 'receta', titulo: 'Cargar la receta de un plato', area: 'stock', roles: G, pasos: [
     { ir: '/stock/recetas', foco: 'editar-receta', titulo: 'Recetas y costos', texto: 'Poné cuánto lleva de cada artículo, limpio y por porción (por ejemplo 0,4 kg de vacío). Te muestro el costo y cuánto deja.' },
   ] },
+  { id: 'compra', titulo: 'Cargar una compra a mano', area: 'stock', roles: G, pasos: [
+    { ir: '/stock/compras', foco: 'compra-manual', titulo: 'Lo que entró', texto: 'Tocá Cargar compra y anotá cada artículo con la cantidad y lo que pagaste. Suma al stock y queda el gasto, aparte de lo que calculan las recetas.' },
+    { ir: '/stock/compras', foco: 'compras-cargadas', titulo: 'Compras cargadas', texto: 'Acá ves lo que se cargó el último mes. Si una quedó mal o repetida, abrila y anulala: se saca del stock y se borra el gasto.' },
+  ] },
   { id: 'factura', titulo: 'Cargar una factura con foto o PDF', area: 'stock', roles: G, pasos: [
     { ir: '/stock/compras', foco: 'factura', titulo: 'La factura', texto: 'Sacale foto o subí el PDF. Leo cada línea y te muestro todo para revisar antes de cargar: entra al stock y queda el gasto.' },
     { ir: '/stock/compras', foco: 'lista-compras', titulo: 'Qué comprar', texto: 'Esta lista se arma con lo que hay, lo que se vende cada día y el colchón que elegiste en Configuración.' },

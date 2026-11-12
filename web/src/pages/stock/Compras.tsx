@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { DIAS, DIAS_LARGO, fecha, jornada, num, pct, plata, sumarDias } from '../../lib/formato'
 import type { Insumo, Proveedor } from '../../lib/tipos'
 import { SubNavStock } from './nav'
-import { CompraModal, FacturaModal, useBaseStock } from '../../components/stock'
+import { CompraManualModal, CompraModal, FacturaModal, useBaseStock } from '../../components/stock'
 import { Cabeza, Modal, Pill, useAccion, useToast } from '../../components/ui'
 
 interface Prevision { historial: boolean; dias: number; cerrado_hoy: boolean; dow: number; platos_hoy: { id: number; nombre: string; estacion: string; cantidad: number }[]; insumos_hoy: { id: number; uso: number }[]; insumos: Record<string, number> }
@@ -37,10 +37,11 @@ export default function Compras() {
     ])
     return { prev, par, subas }
   })
-  const [ventana, setVentana] = useState<null | 'config' | { compra: Insumo; q: number } | { factura: File }>(null)
+  const [ventana, setVentana] = useState<null | 'config' | 'manual' | { compra: Insumo; q: number } | { factura: File }>(null)
+  const [vHist, setVHist] = useState(0)
   const archivo = useRef<HTMLInputElement>(null)
   const avisar = useToast()
-  const recargar = () => { base.recargar(); extra.recargar() }
+  const recargar = () => { base.recargar(); extra.recargar(); setVHist((v) => v + 1) }
 
   if (base.error || extra.error) return <div className="aviso bad">{base.error || extra.error}</div>
   if (!base.datos || !extra.datos) return <><SubNavStock /><p className="cargando">Calculando compras…</p></>
@@ -64,7 +65,8 @@ export default function Compras() {
 
   return <>
     <Cabeza etiqueta="Depósito" titulo="Compras">
-      <button className="btn pri" onClick={() => archivo.current?.click()} data-ayuda="factura">Cargar factura (foto o PDF)</button>
+      <button className="btn pri" onClick={() => setVentana('manual')} data-ayuda="compra-manual">Cargar compra</button>
+      <button className="btn" onClick={() => archivo.current?.click()} data-ayuda="factura">Factura con foto o PDF</button>
       {perfil?.rol === 'admin' && <button className="btn" onClick={() => setVentana('config')}>Ajustar cálculo</button>}
     </Cabeza>
     <input ref={archivo} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden id="fac-file"
@@ -107,6 +109,9 @@ export default function Compras() {
       </> : <div className="kempty">No hace falta comprar nada para los próximos {n} días.</div>}
     </section>
 
+    <Historial version={vHist} onCambio={recargar} />
+
+    {ventana === 'manual' && <CompraManualModal insumos={insumos} proveedores={proveedores} cuentas={cuentas} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); recargar() }} />}
     {ventana === 'config' && <ConfigCompras par={par} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); extra.recargar() }} />}
     {ventana && typeof ventana === 'object' && 'compra' in ventana && <CompraModal insumo={ventana.compra} cantidad={ventana.q} proveedores={proveedores} cuentas={cuentas} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); recargar() }} />}
     {ventana && typeof ventana === 'object' && 'factura' in ventana && <FacturaModal archivo={ventana.factura} insumos={insumos} proveedores={proveedores} cuentas={cuentas} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); recargar() }} />}
@@ -130,4 +135,42 @@ function ConfigCompras({ par, onCerrar, onListo }: { par: Record<string, string>
     <p className="muted" style={{ fontSize: 13, margin: 0 }}>Días: cada cuánto compran o reciben pedidos. Colchón: margen extra por si la noche viene más movida.</p>
     <div className="campo">Días que el local está cerrado<div className="chips">{DIAS.map((d, k) => <button key={d} className="chip" aria-pressed={cerr.includes(k)} onClick={() => setCerr(cerr.includes(k) ? cerr.filter((x) => x !== k) : [...cerr, k])}>{d}</button>)}</div></div>
   </Modal>
+}
+
+// ------------------------------------------------------------------ compras cargadas (últimos 30 días), con anular
+interface CompraH { id: number; fecha: string; numero: string | null; total: number; proveedores: { nombre: string } | null; perfiles: { nombre: string } | null
+  movimientos_stock: { cantidad: number; costo_unit: number; insumos: { nombre: string; unidad: string } | null }[] }
+
+function Historial({ version, onCambio }: { version: number; onCambio: () => void }) {
+  const h = useConsulta(() => tabla<CompraH[]>(supabase.from('compras')
+    .select('id, fecha, numero, total, proveedores(nombre), perfiles(nombre), movimientos_stock(cantidad, costo_unit, insumos(nombre, unidad))')
+    .gte('fecha', sumarDias(jornada(), -30)).order('fecha', { ascending: false }).order('id', { ascending: false }).limit(100)), [version])
+  const [abierta, setAbierta] = useState<number | null>(null)
+  const [anular, setAnular] = useState<CompraH | null>(null)
+  const { correr, ocupado } = useAccion()
+  const lista = h.datos ?? []
+  return <section className="panel" style={{ marginTop: 16 }} data-ayuda="compras-cargadas">
+    <div className="fila" style={{ marginBottom: 4 }}><h3 className="grow">Compras cargadas</h3>{lista.length > 0 && <span className="muted mono" style={{ fontSize: 13 }}>{plata(lista.reduce((s, c) => s + Number(c.total), 0))} en 30 días</span>}</div>
+    {h.error ? <div className="aviso bad">{h.error}</div> : !h.datos ? <p className="cargando">Cargando…</p>
+      : !lista.length ? <div className="kempty">Todavía no cargaste compras en los últimos 30 días.</div>
+      : <div className="rows">{lista.map((c) => <div key={c.id} className="row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+        <div className="fila" style={{ flexWrap: 'nowrap' }}>
+          <button className="link grow" style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit', fontSize: 14 }} aria-expanded={abierta === c.id} onClick={() => setAbierta(abierta === c.id ? null : c.id)}>
+            <b>{fecha(c.fecha)}</b> · {c.proveedores?.nombre ?? 'Sin proveedor'}{c.numero ? <span className="muted"> · {c.numero}</span> : null}
+            <div className="muted" style={{ fontSize: 12 }}>{c.movimientos_stock.length} artículo{c.movimientos_stock.length === 1 ? '' : 's'}{c.perfiles?.nombre ? ` · cargó ${c.perfiles.nombre}` : ''}</div>
+          </button>
+          <span className="mono" style={{ whiteSpace: 'nowrap' }}>{plata(c.total)}</span>
+        </div>
+        {abierta === c.id && <div style={{ paddingLeft: 4 }}>
+          {c.movimientos_stock.map((m, k) => <div key={k} className="fila" style={{ fontSize: 13, flexWrap: 'nowrap' }}><span className="grow">{m.insumos?.nombre ?? '—'}</span>
+            <span className="mono">{num(m.cantidad)} {m.insumos?.unidad}</span><span className="mono muted" style={{ minWidth: 90, textAlign: 'right' }}>{plata(m.cantidad * m.costo_unit)}</span></div>)}
+          <button className="btn sm ghost danger" style={{ marginTop: 8 }} onClick={() => setAnular(c)}>Anular esta compra</button>
+        </div>}
+      </div>)}</div>}
+    {anular && <Modal titulo="Anular compra" onCerrar={() => setAnular(null)} pie={<><span className="grow" /><button className="btn" onClick={() => setAnular(null)}>No</button>
+      <button className="btn pri danger" disabled={ocupado} onClick={async () => { if (await correr(() => rpc('anular_compra', { p_compra: anular.id }), 'Compra anulada')) { setAnular(null); setAbierta(null); onCambio() } }}>Sí, anular</button></>}>
+      <p style={{ margin: 0 }}>Se saca del stock lo que sumó esta compra ({anular.movimientos_stock.map((m) => `${num(m.cantidad)} ${m.insumos?.unidad ?? ''} ${m.insumos?.nombre ?? ''}`).join(', ')}) y se borra el gasto de {plata(anular.total)}.</p>
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>Usalo si se cargó mal o dos veces. Después la podés cargar de nuevo bien.</p>
+    </Modal>}
+  </section>
 }

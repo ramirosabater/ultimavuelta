@@ -140,6 +140,102 @@ export function CompraModal({ insumo, cantidad, proveedores, cuentas, onCerrar, 
   </Modal>
 }
 
+// ------------------------------------------------------------------ compra a mano (varios artículos, con o sin factura)
+interface LineaManual { insumo_id: string; nombre: string; unidad: string; cantidad: string; total: string }
+const lineaVacia = (): LineaManual => ({ insumo_id: '', nombre: '', unidad: 'kg', cantidad: '', total: '' })
+
+export function CompraManualModal({ insumos, proveedores, cuentas, onCerrar, onListo }: { insumos: Insumo[]; proveedores: Proveedor[]; cuentas: Cuenta[]; onCerrar: () => void; onListo: () => void }) {
+  const [prov, setProv] = useState(''), [provNuevo, setProvNuevo] = useState('')
+  const [fechaC, setFechaC] = useState(hoy()), [numero, setNumero] = useState('')
+  const [pago, setPago] = useState(pagoPorDefecto(undefined, cuentas))
+  const [filas, setFilas] = useState<LineaManual[]>([lineaVacia()])
+  const [err, setErr] = useState('')
+  const { correr, ocupado } = useAccion()
+  const activos = insumos.filter((i) => i.activo)
+  const cambiar = (k: number, c: Partial<LineaManual>) => setFilas((fs) => fs.map((f, i) => i === k ? { ...f, ...c } : f))
+  const llenas = filas.filter((f) => f.insumo_id || f.cantidad || f.total)
+  const total = llenas.reduce((s, f) => s + (Number(f.total) || 0), 0)
+  function elegirProv(v: string) { setProv(v); setPago(pagoPorDefecto(proveedores.find((p) => String(p.id) === v), cuentas)) }
+
+  async function cargar() {
+    setErr('')
+    if (!llenas.length) { setErr('Agregá al menos un artículo.'); return }
+    for (const f of llenas) {
+      if (!f.insumo_id) { setErr('Elegí el artículo de cada línea.'); return }
+      if (f.insumo_id === 'nuevo' && !f.nombre.trim()) { setErr('Poné el nombre del artículo nuevo.'); return }
+      if (!(Number(f.cantidad) > 0)) { setErr('Cada línea necesita la cantidad que entró.'); return }
+    }
+    if (prov === 'nuevo' && !provNuevo.trim()) { setErr('Poné el nombre del proveedor nuevo.'); return }
+    const ok = await correr(async () => {
+      // Los artículos nuevos se crean primero (con lo mínimo: nombre y unidad; el resto se completa en Artículos)
+      const items = []
+      for (const f of llenas) {
+        let id = Number(f.insumo_id)
+        if (f.insumo_id === 'nuevo') {
+          const nombre = f.nombre.trim()
+          const ya = insumos.find((i) => i.nombre.toLowerCase() === nombre.toLowerCase())
+          if (ya) id = ya.id
+          else {
+            const { data, error } = await supabase.from('insumos').insert({ nombre, unidad: f.unidad.trim() || 'u.', cantidad: 0, proveedor_id: prov && prov !== 'nuevo' ? Number(prov) : null }).select('id').single()
+            if (error) throw new Error(error.code === '23505' ? `Ya hay un artículo «${nombre}».` : error.message)
+            id = (data as { id: number }).id
+          }
+        }
+        items.push({ insumo_id: id, cantidad: Number(f.cantidad), total: Number(f.total) || 0 })
+      }
+      await rpc('registrar_compra', {
+        p_items: items, p_proveedor: prov && prov !== 'nuevo' ? Number(prov) : null, p_proveedor_nuevo: prov === 'nuevo' ? provNuevo.trim() : null,
+        p_numero: numero.trim() || null, p_fecha: fechaC || null, p_pago: pago,
+      })
+    }, `Compra cargada: ${llenas.length} artículo${llenas.length > 1 ? 's' : ''}`)
+    if (ok) onListo()
+  }
+
+  return <Modal titulo="Cargar compra" onCerrar={onCerrar} ancho={680} pie={<>
+    <div className="grow"><div className="label">Total</div><div className="mono" style={{ fontWeight: 600, fontSize: 18 }}>{plata(total)}</div></div>
+    <button className="btn pri" disabled={ocupado} onClick={cargar}>Sumar al stock</button></>}>
+    <div className="two">
+      <label className="campo">Proveedor<select id="m-prov" value={prov} onChange={(e) => elegirProv(e.target.value)}>
+        <option value="">Sin proveedor (súper, almacén…)</option>
+        {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+        <option value="nuevo">＋ Proveedor nuevo…</option></select></label>
+      {prov === 'nuevo' ? <label className="campo">Nombre del proveedor<input id="m-provn" value={provNuevo} onChange={(e) => setProvNuevo(e.target.value)} autoFocus /></label>
+        : <label className="campo">Fecha<input id="m-fecha" type="date" value={fechaC} onChange={(e) => setFechaC(e.target.value)} /></label>}
+    </div>
+    {prov === 'nuevo' && <label className="campo">Fecha<input id="m-fecha" type="date" value={fechaC} onChange={(e) => setFechaC(e.target.value)} /></label>}
+    <div className="two">
+      <label className="campo">Factura o remito (opcional)<input id="m-num" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej.: 0003-00012345" /></label>
+      <label className="campo">Pago<SelectPago id="m-pago" valor={pago} onCambio={setPago} cuentas={cuentas} /></label>
+    </div>
+    <p className="muted" style={{ margin: 0, fontSize: 13 }}>Cargá lo que entró de verdad, como venga. Suma al stock, actualiza el costo de cada artículo y queda el gasto. No depende de la lista de compras ni de las recetas.</p>
+    <div className="rows">{filas.map((f, k) => {
+      const i = insumos.find((x) => String(x.id) === f.insumo_id), unidad = f.insumo_id === 'nuevo' ? f.unidad : i?.unidad
+      const c = Number(f.cantidad), t = Number(f.total), cu = c > 0 && t > 0 ? t / c : null, d = cu && i?.costo ? cu / i.costo - 1 : null
+      return <div key={k} className="row" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
+        <div className="fila" style={{ width: '100%', flexWrap: 'nowrap' }}>
+          <select id={`m-i-${k}`} className="grow" aria-label="Artículo" value={f.insumo_id} onChange={(e) => cambiar(k, { insumo_id: e.target.value })}>
+            <option value="">Elegí el artículo…</option>
+            {activos.map((x) => <option key={x.id} value={x.id}>{x.nombre} ({x.unidad})</option>)}
+            <option value="nuevo">＋ Artículo nuevo…</option></select>
+          {filas.length > 1 && <button className="btn sm ghost danger" aria-label="Sacar esta línea" title="Sacar esta línea" onClick={() => setFilas(filas.filter((_, j) => j !== k))}>✕</button>}
+        </div>
+        {f.insumo_id === 'nuevo' && <div className="two" style={{ width: '100%' }}>
+          <label className="campo">Nombre<input id={`m-n-${k}`} value={f.nombre} onChange={(e) => cambiar(k, { nombre: e.target.value })} placeholder="Ej.: Fernet 750 ml" autoFocus /></label>
+          <label className="campo">Unidad<input id={`m-u-${k}`} list="i-unidades-m" value={f.unidad} onChange={(e) => cambiar(k, { unidad: e.target.value })} /></label>
+        </div>}
+        <div className="two" style={{ width: '100%' }}>
+          <label className="campo">Cantidad{unidad ? ` (${unidad})` : ''}<input id={`m-c-${k}`} type="number" step="any" min={0} inputMode="decimal" value={f.cantidad} onChange={(e) => cambiar(k, { cantidad: e.target.value })} /></label>
+          <label className="campo">Total pagado ($)<input id={`m-t-${k}`} type="number" step="any" min={0} inputMode="decimal" value={f.total} onChange={(e) => cambiar(k, { total: e.target.value })} placeholder="Opcional" /></label>
+        </div>
+        {cu != null && unidad && <div style={{ fontSize: 13 }}><span className="mono">{plata(cu)} por {unidad}</span> {d != null && (d > 0.1 ? <Pill tono="crit">Subió {pct(d)}</Pill> : d > 0.02 ? <Pill tono="warn">Subió {pct(d)}</Pill> : d < -0.02 ? <Pill tono="ok">Bajó {pct(-d)}</Pill> : <Pill>Igual que antes</Pill>)}</div>}
+      </div>
+    })}</div>
+    <datalist id="i-unidades-m">{UNIDADES.map((u) => <option key={u} value={u} />)}</datalist>
+    <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setFilas([...filas, lineaVacia()])}>＋ Otro artículo</button>
+    {err && <div className="err">{err}</div>}
+  </Modal>
+}
+
 // ------------------------------------------------------------------ merma
 export function MermaModal({ insumos, inicial, onCerrar, onListo }: { insumos: Insumo[]; inicial?: number; onCerrar: () => void; onListo: () => void }) {
   const [iid, setIid] = useState(String(inicial ?? insumos[0]?.id ?? ''))

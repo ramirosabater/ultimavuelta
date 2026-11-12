@@ -202,5 +202,29 @@ select format('   sentada en la mesa %s: %s comensales, reserva %s', m.numero, m
 select pg_temp.debe_fallar(format('select sentar_reserva(%s, %s)', :res, :mesa_libre), 'ya fue sentada');
 select pg_temp.como(:'ADMIN');
 select '   contexto con reservas: ' || (contexto_ayudante() like '%Reservas de hoy: %Rodríguez%');
+
+\echo '11. Compra a mano y anular una compra mal cargada'
+select pg_temp.como(:'ADMIN');
+select cantidad as vac0, costo as vacc0 from insumos where nombre = 'Vacío' \gset
+select (select coalesce(sum(saldo_cuenta(id)), 0) from cuentas where activa) as saldo0 \gset
+select (registrar_compra(jsonb_build_array(
+  jsonb_build_object('insumo_id', (select id from insumos where nombre = 'Vacío'), 'cantidad', 4, 'total', 60000)),
+  null, null, null, (select id from cuentas order by orden limit 1)::text)->>'compra')::bigint as cmal \gset
+select format('   compra mal cargada: vacío %s kg a %s', cantidad, costo) from insumos where nombre = 'Vacío';
+select pg_temp.como(:'MOZO');
+select pg_temp.debe_fallar(format('select anular_compra(%s)', :cmal), 'anulan compras');
+select pg_temp.como(:'ADMIN');
+select '   anulada: ' || anular_compra(:cmal)::text;
+select set_config('prueba.vac0', :'vac0', false), set_config('prueba.vacc0', :'vacc0', false) \gset
+do $$ declare v insumos; begin
+  select * into v from insumos where nombre = 'Vacío';
+  if v.cantidad <> current_setting('prueba.vac0')::numeric then raise exception 'El stock no volvió: % (era %)', v.cantidad, current_setting('prueba.vac0'); end if;
+  if v.costo <> current_setting('prueba.vacc0')::numeric then raise exception 'El costo no volvió: % (era %)', v.costo, current_setting('prueba.vacc0'); end if;
+end $$ ;
+select format('   vacío de vuelta: %s kg a %s', cantidad, costo) from insumos where nombre = 'Vacío';
+do $$ begin if exists (select 1 from gastos where concepto = 'Compra: Vacío' and monto = 60000) then raise exception 'Quedó el gasto de la compra anulada'; end if; end $$;
+do $$ begin if exists (select 1 from compras c where not exists (select 1 from movimientos_stock m where m.compra_id = c.id)) then raise exception 'Quedó una compra vacía'; end if; end $$;
+select case when (select coalesce(sum(saldo_cuenta(id)), 0) from cuentas where activa) = :saldo0 then '   la plata de la cuenta volvió' else 'ERROR: el saldo no volvió' end;
+select pg_temp.debe_fallar(format('select anular_compra(%s)', :cmal), 'No encontramos');
 reset role;
 \echo 'TODO BIEN'
