@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './base-prototipo.css'
 import './index.css'
 import './tema-carreras.css'
+import './tema-animado.css'
 
 const root = createRoot(document.getElementById('root')!)
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined

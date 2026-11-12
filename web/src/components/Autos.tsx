@@ -1,48 +1,27 @@
 import { useId } from 'react'
 
-// Autos de carrera dibujados para la app (no son fotos ni copias de autos reales):
-// uno por cada categoría que corre en Comodoro y la zona, en los colores del logo.
+// Autos de carrera dibujados para la app, en estilo dibujo animado (gorditos, ruedas grandes, contorno grueso).
+// No son copias de autos reales ni de personajes: uno por cada categoría que corre en Comodoro y la zona.
 export type Cat = 'tc' | 'austral' | 'r12' | 'gol' | 'p1100'
 
 type Molde = {
-  cuerpo: string; vidrios: string[]; ruedas: [number, number]; r: number
-  num: [number, number, number]; color: string; franja: string; aleron?: string; luz: [number, number]; cola: [number, number]
+  x0: number; x1: number; alto: number     // largo de la carrocería y altura del capó
+  cA: number; cB: number; techo: number    // cabina: desde dónde hasta dónde y qué tan alta
+  ruedas: [number, number]; r: number
+  color: string; franja: string; llanta: string; aleron?: boolean; cola?: boolean   // cola: hatchback (cola cortada)
 }
 
 const MOLDES: Record<Cat, Molde> = {
   // Turismo Carretera: sedán largo y bajo, con alerón
-  tc: {
-    cuerpo: 'M14 74 L14 58 Q15 51 26 50 L72 46 Q86 30 100 28 L150 28 Q162 28 172 38 L184 47 L220 52 Q230 54 231 62 L231 74 Z',
-    vidrios: ['M82 46 Q92 34 102 32 L124 32 L124 46 Z', 'M128 32 L148 32 Q158 32 165 39 L171 46 L128 46 Z'],
-    ruedas: [58, 184], r: 15, num: [128, 60, 10], color: '#1f3a5f', franja: '#c9a35a',
-    aleron: 'M6 35 L44 35 L44 40 L6 40 Z M20 40 h4 v11 h-4 Z M34 40 h4 v10 h-4 Z', luz: [224, 56], cola: [15, 55],
-  },
-  // TC Austral: sedán con trompa más larga
-  austral: {
-    cuerpo: 'M16 74 L16 57 Q17 51 28 50 L80 47 Q92 31 104 30 L146 30 Q156 30 164 38 L176 47 L222 51 Q231 53 232 61 L232 74 Z',
-    vidrios: ['M88 46 Q96 35 106 34 L124 34 L124 46 Z', 'M128 34 L146 34 Q154 34 160 40 L166 46 L128 46 Z'],
-    ruedas: [60, 186], r: 15, num: [124, 60, 10], color: '#c8231e', franja: '#ffffff',
-    aleron: 'M10 38 L42 38 L42 42 L10 42 Z M24 42 h4 v9 h-4 Z', luz: [225, 56], cola: [17, 55],
-  },
+  tc: { x0: 12, x1: 228, alto: 50, cA: 72, cB: 176, techo: 24, ruedas: [58, 184], r: 20, color: '#1d5fc4', franja: '#ffcf33', llanta: '#ffcf33', aleron: true },
+  // TC Austral: trompa larga, rojo
+  austral: { x0: 12, x1: 228, alto: 51, cA: 80, cB: 178, techo: 26, ruedas: [60, 186], r: 20, color: '#e02a1f', franja: '#fff6e0', llanta: '#e9edf2', aleron: true },
   // Monomarca: sedancito de tres volúmenes, alto y cuadrado
-  r12: {
-    cuerpo: 'M20 74 L20 56 Q21 51 30 50 L68 49 L84 30 Q86 28 92 28 L140 28 Q146 28 150 32 L166 49 L210 51 Q218 52 218 58 L218 74 Z',
-    vidrios: ['M88 47 L97 33 L114 33 L114 47 Z', 'M118 33 L138 33 Q143 33 146 37 L156 47 L118 47 Z'],
-    ruedas: [62, 174], r: 14, num: [117, 61, 10], color: '#c9a35a', franja: '#1f3a5f', luz: [212, 55], cola: [21, 55],
-  },
+  r12: { x0: 22, x1: 220, alto: 50, cA: 76, cB: 162, techo: 20, ruedas: [64, 178], r: 19, color: '#f5b52a', franja: '#1d3557', llanta: '#e9edf2' },
   // Turismo Pista 1.6: hatchback de cola corta
-  gol: {
-    cuerpo: 'M40 74 L40 48 Q40 36 50 34 L70 31 L118 29 Q128 29 136 35 L156 48 L198 52 Q208 54 208 60 L208 74 Z',
-    vidrios: ['M50 46 L53 37 L68 34 L68 46 Z', 'M72 34 L96 32 L96 46 L72 46 Z', 'M100 32 L118 32 Q126 32 132 37 L144 46 L100 46 Z'],
-    ruedas: [72, 170], r: 14, num: [98, 60, 10], color: '#3b8c93', franja: '#ffffff',
-    aleron: 'M36 33 L60 31 L60 34 L36 37 Z', luz: [202, 56], cola: [41, 52],
-  },
+  gol: { x0: 36, x1: 212, alto: 48, cA: 40, cB: 158, techo: 23, ruedas: [76, 172], r: 19, color: '#1fa6a0', franja: '#fff6e0', llanta: '#ffcf33', cola: true },
   // Turismo Pista 1100: el chiquito
-  p1100: {
-    cuerpo: 'M34 74 L34 52 Q34 44 44 43 L62 42 L76 28 Q78 26 84 26 L120 26 Q126 26 130 31 L142 44 L172 47 Q180 48 180 55 L180 74 Z',
-    vidrios: ['M70 42 L80 30 L100 30 L100 42 Z', 'M104 30 L120 30 Q124 30 127 34 L135 42 L104 42 Z'],
-    ruedas: [66, 152], r: 13, num: [104, 57, 9], color: '#e8e2d4', franja: '#c8231e', luz: [175, 53], cola: [35, 52],
-  },
+  p1100: { x0: 40, x1: 190, alto: 50, cA: 70, cB: 148, techo: 22, ruedas: [72, 160], r: 18, color: '#fbf0dc', franja: '#e02a1f', llanta: '#e02a1f' },
 }
 
 export const LARGADA: { cat: Cat; nombre: string; numero: number }[] = [
@@ -53,32 +32,80 @@ export const LARGADA: { cat: Cat; nombre: string; numero: number }[] = [
   { cat: 'p1100', nombre: 'TP 1100', numero: 11 },
 ]
 
+const TINTA = '#2a1810'
+const PISO = 86   // centro de las ruedas
+
+function formas(m: Molde) {
+  const { x0, x1, alto: a, cA, cB, techo: t } = m
+  // Carrocería: panza redonda, capó (adelante, a la derecha) un poco más bajo que el baúl
+  const baul = m.cola ? a - 6 : a
+  const cuerpo = `M${x0 + 12} ${PISO + 2} L${x1 - 12} ${PISO + 2} Q${x1 + 1} ${PISO + 2} ${x1} ${PISO - 10} L${x1} ${a + 14}
+    Q${x1 - 1} ${a + 4} ${x1 - 16} ${a + 2} L${cB} ${a} L${cA} ${baul} L${x0 + 16} ${baul + 1}
+    Q${x0} ${baul + 3} ${x0} ${baul + 18} L${x0} ${PISO - 10} Q${x0} ${PISO + 2} ${x0 + 12} ${PISO + 2} Z`
+  // Cabina: burbuja con parabrisas inclinado
+  const atras = m.cola ? `M${cA} ${baul + 2} C${cA - 2} ${t + 14} ${cA + 4} ${t} ${cA + 18} ${t}` : `M${cA} ${baul + 2} C${cA + 8} ${t + 2} ${cA + 16} ${t} ${cA + 28} ${t}`
+  const cabina = `${atras} L${cB - 30} ${t} C${cB - 16} ${t} ${cB - 4} ${a - 10} ${cB + 8} ${a + 2} Z`
+  const mid = Math.round((cA + cB) / 2) - 2
+  const vAtras = m.cola ? `M${cA + 6} ${baul} C${cA + 5} ${t + 14} ${cA + 9} ${t + 6} ${cA + 19} ${t + 6} L${mid - 3} ${t + 6} L${mid - 3} ${baul} Z`
+    : `M${cA + 10} ${baul} C${cA + 15} ${t + 8} ${cA + 20} ${t + 6} ${cA + 29} ${t + 6} L${mid - 3} ${t + 6} L${mid - 3} ${a} Z`
+  const vAdelante = `M${mid + 3} ${a} L${mid + 3} ${t + 6} L${cB - 31} ${t + 6} C${cB - 20} ${t + 6} ${cB - 11} ${a - 9} ${cB - 3} ${a} Z`
+  return { cuerpo, cabina, vidrios: [vAtras, vAdelante], mid }
+}
+
 export function Auto({ cat, numero, className, titulo }: { cat: Cat; numero?: number; className?: string; titulo?: string }) {
-  const m = MOLDES[cat], id = useId().replace(/:/g, ''), [nx, ny, nr] = m.num
-  const oscuro = m.color === '#e8e2d4' || m.color === '#c9a35a'
-  return <svg className={`auto ${className ?? ''}`} viewBox="0 0 240 100" role={titulo ? 'img' : undefined} aria-label={titulo} aria-hidden={titulo ? undefined : true}>
-    <defs><clipPath id={`c${id}`}><path d={m.cuerpo} /></clipPath></defs>
-    <ellipse cx="120" cy="92" rx="112" ry="5" fill="#000" opacity=".22" />
-    {m.aleron && <path d={m.aleron} fill="#111" />}
-    <path d={m.cuerpo} fill={m.color} stroke="#0b0f16" strokeWidth="2" strokeLinejoin="round" />
-    <g clipPath={`url(#c${id})`}>
-      <rect x="0" y="57" width="240" height="5" fill={m.franja} />
-      <rect x="0" y="64" width="240" height="2" fill={m.franja} />
-      <rect x="0" y="70" width="240" height="6" fill="#0b0f16" opacity=".35" />
-      {m.ruedas.map((x) => <circle key={x} cx={x} cy="76" r={m.r + 4} fill="#0b0f16" />)}
-    </g>
-    {m.vidrios.map((d) => <path key={d} d={d} fill="#1b2a3a" stroke="#0b0f16" strokeWidth="1.2" />)}
-    {m.vidrios.map((d) => <path key={`b${d}`} d={d} fill="none" stroke="#9fc6d0" strokeWidth=".8" opacity=".5" />)}
-    <rect x={m.luz[0]} y={m.luz[1]} width="6" height="4" rx="1.5" fill="#ffe08a" />
-    <rect x={m.cola[0]} y={m.cola[1]} width="4" height="4" rx="1" fill="#e53b2f" />
-    {numero != null && <g>
-      <circle cx={nx} cy={ny} r={nr} fill="#fff" stroke="#111" strokeWidth="2" />
-      <text x={nx} y={ny + nr * 0.38} textAnchor="middle" fontSize={nr * 1.15} fontWeight="800" fontStyle="italic" fontFamily="'Saira Condensed', Impact, sans-serif" fill="#111">{numero}</text>
+  const m = MOLDES[cat], id = useId().replace(/:/g, '')
+  const { cuerpo, cabina, vidrios, mid } = formas(m)
+  const puerta = (m.cA + m.cB) / 2 + 2, ny = (m.alto + PISO) / 2 + 1, nr = 11
+  return <svg className={`auto ${className ?? ''}`} viewBox="0 -2 240 112" role={titulo ? 'img' : undefined} aria-label={titulo} aria-hidden={titulo ? undefined : true}>
+    <defs>
+      <clipPath id={`c${id}`}><path d={cuerpo} /><path d={cabina} /></clipPath>
+      <linearGradient id={`g${id}`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#fff" stopOpacity=".38" /><stop offset=".45" stopColor="#fff" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity=".28" />
+      </linearGradient>
+    </defs>
+    <ellipse cx="120" cy={PISO + m.r + 1} rx="108" ry="6" fill="#000" opacity=".2" />
+    {/* alerón */}
+    {m.aleron && <g stroke={TINTA} strokeWidth="3" strokeLinejoin="round">
+      <path d={`M${m.x0 + 16} ${m.alto - 2} L${m.x0 + 16} ${m.alto - 16} M${m.x0 + 34} ${m.alto - 2} L${m.x0 + 34} ${m.alto - 14}`} strokeLinecap="round" />
+      <path d={`M${m.x0 + 2} ${m.alto - 22} Q${m.x0 + 26} ${m.alto - 27} ${m.x0 + 46} ${m.alto - 20} L${m.x0 + 46} ${m.alto - 14} Q${m.x0 + 24} ${m.alto - 19} ${m.x0 + 2} ${m.alto - 15} Z`} fill={m.franja} />
     </g>}
+    {/* contorno: las dos piezas con trazo grueso, después el relleno encima (así queda una sola silueta) */}
+    <path d={cabina} fill={TINTA} stroke={TINTA} strokeWidth="7" strokeLinejoin="round" />
+    <path d={cuerpo} fill={TINTA} stroke={TINTA} strokeWidth="7" strokeLinejoin="round" />
+    <g clipPath={`url(#c${id})`}>
+      <path d={cabina} fill={m.color} /><path d={cuerpo} fill={m.color} />
+      {/* franjas de carrera */}
+      <rect x="0" y={m.alto + 9} width="240" height="7" fill={m.franja} />
+      <rect x="0" y={m.alto + 18} width="240" height="2.5" fill={m.franja} />
+      <rect x="0" y="0" width="240" height="112" fill={`url(#g${id})`} />
+      {/* pasaruedas */}
+      {m.ruedas.map((x) => <circle key={x} cx={x} cy={PISO} r={m.r + 5} fill={TINTA} />)}
+    </g>
+    {/* vidrios con reflejo */}
+    {vidrios.map((d) => <path key={d} d={d} fill="#bfe6ee" stroke={TINTA} strokeWidth="2.5" strokeLinejoin="round" />)}
+    <path d={`M${mid - 14} ${m.techo + 9} l-8 ${m.alto - m.techo - 13}`} stroke="#fff" strokeWidth="3.5" strokeLinecap="round" opacity=".8" />
+    <path d={`M${mid + 14} ${m.techo + 9} l-6 ${m.alto - m.techo - 13}`} stroke="#fff" strokeWidth="2.5" strokeLinecap="round" opacity=".7" />
+    {/* brillo del techo y del costado */}
+    <path d={`M${m.cA + 24} ${m.techo + 3} L${m.cB - 34} ${m.techo + 3}`} stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity=".7" />
+    <path d={`M${m.x0 + 14} ${m.alto + 5} L${m.x0 + 40} ${m.alto + 4}`} stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity=".55" />
+    {/* paragolpes cromados */}
+    <rect x={m.x1 - 12} y={PISO - 6} width="16" height="7" rx="3.5" fill="#dfe4ea" stroke={TINTA} strokeWidth="2.5" />
+    <rect x={m.x0 - 4} y={PISO - 6} width="16" height="7" rx="3.5" fill="#dfe4ea" stroke={TINTA} strokeWidth="2.5" />
+    {/* faro grande y luz de atrás */}
+    <circle cx={m.x1 - 7} cy={m.alto + 14} r="6" fill="#fff2a8" stroke={TINTA} strokeWidth="2.5" />
+    <circle cx={m.x1 - 8.5} cy={m.alto + 12.5} r="1.8" fill="#fff" />
+    <rect x={m.x0 - 1} y={(m.cola ? m.alto - 6 : m.alto) + 9} width="6" height="9" rx="3" fill="#ff4a3a" stroke={TINTA} strokeWidth="2" />
+    {/* número en la puerta */}
+    {numero != null && <g>
+      <circle cx={puerta} cy={ny} r={nr} fill="#fff" stroke={TINTA} strokeWidth="2.5" />
+      <text x={puerta} y={ny + nr * 0.42} textAnchor="middle" fontSize={nr * 1.25} fontFamily="'Lilita One', Impact, sans-serif" fill={TINTA}>{numero}</text>
+    </g>}
+    {/* ruedas gordas */}
     {m.ruedas.map((x) => <g key={`w${x}`}>
-      <circle cx={x} cy="76" r={m.r} fill="#121212" />
-      <circle cx={x} cy="76" r={m.r * 0.58} fill={oscuro ? '#2b2b2b' : '#c9ced6'} />
-      <circle cx={x} cy="76" r={m.r * 0.2} fill="#555" />
+      <circle cx={x} cy={PISO} r={m.r} fill="#1d1d1f" stroke={TINTA} strokeWidth="3" />
+      <circle cx={x} cy={PISO} r={m.r * 0.56} fill={m.llanta} stroke={TINTA} strokeWidth="2.5" />
+      <circle cx={x} cy={PISO} r={m.r * 0.18} fill={TINTA} />
+      <path d={`M${x - m.r * 0.62} ${PISO - m.r * 0.35} A${m.r * 0.75} ${m.r * 0.75} 0 0 1 ${x - m.r * 0.2} ${PISO - m.r * 0.72}`} stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" opacity=".45" />
     </g>)}
   </svg>
 }
