@@ -96,7 +96,7 @@ export default function Compras() {
         {filas.length > 0 && <button className="btn sm" onClick={async () => { try { await navigator.clipboard.writeText(texto()); avisar('Lista copiada. Pegala en WhatsApp.') } catch { setVentana(null); window.prompt?.('Copiá la lista', texto()) } }}>Copiar para WhatsApp</button>}</div>
       <p className="muted" style={{ fontSize: 13, margin: '0 0 8px', maxWidth: '75ch' }}>{!prev.historial
         ? 'Todavía no hay historial de ventas, así que por ahora sugiero llegar al mínimo de cada artículo más el colchón. Con unas noches cobradas, la lista se calcula sola por lo que se vende cada día de la semana.'
-        : `Lo que se va a usar los próximos ${n} días según las recetas y lo vendido esos mismos días las semanas anteriores, más el colchón (el ${colchon}% o el mínimo del artículo, lo que sea mayor), menos lo que ya hay. Redondeado a la presentación de compra.`}</p>
+        : `Lo que se va a usar los próximos ${n} días según las recetas, lo vendido esos mismos días las semanas anteriores y los platos del día planificados (Carta y QR → Platos del día), más el colchón (el ${colchon}% o el mínimo del artículo, lo que sea mayor), menos lo que ya hay. Redondeado a la presentación de compra.`}</p>
       {filas.length ? <>
         <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th className="r">Hay</th><th className="r">Se usará</th><th className="r">Comprar</th><th className="r">Estimado</th><th /></tr></thead><tbody>
           {filas.map((f) => <tr key={f.i.id}><td><b>{f.i.nombre}</b>{provDe(f.i, proveedores) && <div className="muted" style={{ fontSize: 12 }}>{provDe(f.i, proveedores)}</div>}</td>

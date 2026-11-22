@@ -8,7 +8,7 @@ import { costoPorcion, pillCosto } from '../../components/stock'
 import { Cabeza, Modal, Pill, useAccion } from '../../components/ui'
 import { costoFilas, EstimarReceta, FilasReceta, filasDe, filaVacia, itemsFilas, type FilaReceta } from '../../components/receta'
 
-export const SubNavCarta = () => <SubNav items={[['/carta', 'Carta'], ['/carta/mesas', 'Mesas y QR']]} />
+export const SubNavCarta = () => <SubNav items={[['/carta', 'Carta'], ['/carta/platos', 'Platos del día'], ['/carta/mesas', 'Mesas y QR']]} />
 const EST: Record<Estacion, string> = { cocina: 'Parrilla / cocina', barra: 'Barra' }
 
 export default function Carta() {
@@ -124,13 +124,14 @@ function StockProducto({ prod, onCerrar, onListo }: { prod: Producto; onCerrar: 
   </Modal>
 }
 
-/** Plato del día: nombre, qué lleva y precio. La receta la calcula Chichito (o se carga a mano). */
-function PlatoDelDia({ cats, prods, rec, ins, objetivo, onCerrar, onListo }: { cats: Categoria[]; prods: Producto[]; rec: RecetaItem[]; ins: Insumo[]; objetivo: number; onCerrar: () => void; onListo: () => void }) {
+/** Plato del día: nombre, qué lleva y precio. La receta la calcula Chichito (o se carga a mano).
+ *  planificar: solo se guarda (para la semana), no se pone en la carta. inicial: abre uno ya hecho para editarlo. */
+export function PlatoDelDia({ cats, prods, rec, ins, objetivo, planificar = false, inicial, onCerrar, onListo }: { cats: Categoria[]; prods: Producto[]; rec: RecetaItem[]; ins: Insumo[]; objetivo: number; planificar?: boolean; inicial?: Producto; onCerrar: () => void; onListo: (id?: number, nombre?: string) => void }) {
   const cat = cats.find((c) => c.nombre === 'Plato del día')
   const anteriores = cat ? prods.filter((p) => p.categoria_id === cat.id).sort((a, b) => Number(b.activo) - Number(a.activo) || b.id - a.id) : []
-  const [desde, setDesde] = useState<Producto | null>(null)
-  const [f, setF] = useState({ nombre: '', descripcion: '', precio: '' })
-  const [filas, setFilas] = useState<FilaReceta[]>([filaVacia()])
+  const [desde, setDesde] = useState<Producto | null>(inicial ?? null)
+  const [f, setF] = useState(inicial ? { nombre: inicial.nombre, descripcion: inicial.descripcion ?? '', precio: String(inicial.precio) } : { nombre: '', descripcion: '', precio: '' })
+  const [filas, setFilas] = useState<FilaReceta[]>(inicial ? filasDe(rec.filter((r) => r.producto_id === inicial.id)) : [filaVacia()])
   const [porcion, setPorcion] = useState<string | null>(null)
   const [sacar, setSacar] = useState(true)
   const [err, setErr] = useState('')
@@ -152,13 +153,14 @@ function PlatoDelDia({ cats, prods, rec, ins, objetivo, onCerrar, onListo }: { c
     const { items, error } = itemsFilas(filas)
     if (error) { setErr(error); return }
     if (!items.length) { setErr('Falta la receta: tocá "Que Chichito calcule la receta" o cargala a mano.'); return }
-    if (await correr(() => rpc('guardar_plato_del_dia', { p_nombre: f.nombre, p_descripcion: f.descripcion, p_precio: precio, p_items: items, p_sacar_anterior: sacar, p_producto: desde?.id ?? null }),
-      `${f.nombre.trim()}: es el plato del día`)) onListo()
+    let id: number | undefined
+    if (await correr(async () => { id = await rpc<number>('guardar_plato_del_dia', { p_nombre: f.nombre, p_descripcion: f.descripcion, p_precio: precio, p_items: items, p_sacar_anterior: !planificar && sacar, p_producto: desde?.id ?? null, p_activar: !planificar }) },
+      planificar ? `${f.nombre.trim()}: guardado` : `${f.nombre.trim()}: es el plato del día`)) onListo(id, f.nombre.trim())
   }
-  return <Modal titulo="Plato del día" onCerrar={onCerrar} pie={<>
+  return <Modal titulo={planificar ? (inicial ? 'Editar plato del día' : 'Nuevo plato del día') : 'Plato del día'} onCerrar={onCerrar} pie={<>
     <div className="grow"><div className="label">Costo por porción</div><div className="fila"><span className="mono" style={{ fontWeight: 600, fontSize: 18 }}>{plata(costo)}</span>{fc != null && pillCosto(fc, objetivo)}</div></div>
-    <button className="btn pri" id="pd-guardar" disabled={ocupado} onClick={guardar}>Poner en la carta</button></>}>
-    {anteriores.length > 0 && <div>
+    <button className="btn pri" id="pd-guardar" disabled={ocupado} onClick={guardar}>{planificar ? 'Guardar plato' : 'Poner en la carta'}</button></>}>
+    {!planificar && anteriores.length > 0 && <div>
       <div className="label">Volver a poner uno que ya hicieron (con su receta)</div>
       <div className="chips">
         <button className="chip" aria-pressed={!desde} onClick={nuevo}>＋ Uno nuevo</button>
@@ -175,7 +177,7 @@ function PlatoDelDia({ cats, prods, rec, ins, objetivo, onCerrar, onListo }: { c
       {sugerido != null && <div className="campo"><span>Precio sugerido</span><div className="fila"><span className="mono">{plata(sugerido)}</span><span className="muted" style={{ fontSize: 12 }}>({Math.round(objetivo * 100)} % de costo)</span>
         <button className="btn sm" onClick={() => setF({ ...f, precio: String(sugerido) })}>Usar</button></div></div>}
     </div>
-    {hoy && hoy.id !== desde?.id && <label className="check"><input type="checkbox" id="pd-sacar" checked={sacar} onChange={(e) => setSacar(e.target.checked)} /> Sacar de la carta {hoy.nombre} (queda guardado para otro día)</label>}
+    {!planificar && hoy && hoy.id !== desde?.id && <label className="check"><input type="checkbox" id="pd-sacar" checked={sacar} onChange={(e) => setSacar(e.target.checked)} /> Sacar de la carta {hoy.nombre} (queda guardado para otro día)</label>}
     {err && <div className="err">{err}</div>}
   </Modal>
 }

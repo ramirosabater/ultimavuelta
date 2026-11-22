@@ -302,4 +302,44 @@ select format('   vuelve la bondiola: activa %s, precio %s, %s ingredientes · l
               (select activo from productos where id = :pd2)) from productos p where id = :pd1;
 select format('   la categoría: %s (orden %s) con %s platos guardados', c.nombre, c.orden, (select count(*) from productos where categoria_id = c.id)) from categorias c where nombre = 'Plato del día';
 reset role;
+
+\echo '14. Semana de platos del día'
+select pg_temp.como(:'ADMIN');
+select guardar_plato_del_dia('Guiso de lentejas', 'Con chorizo', 12000,
+  '[{"nuevo": {"nombre": "Lentejas", "unidad": "kg", "costo": 3000}, "cantidad": 0.12}, {"nuevo": {"nombre": "Papas"}, "cantidad": 0.1}]', false, null, false) as guiso \gset
+select (select activo from productos where id = :guiso) as guiso_activo, (select producto_id from platos_semana where fecha = jornada_actual()) = :pd1 as plan_hoy_bondiola \gset
+\if :guiso_activo
+  select 1/0 as guardar_sin_activar_lo_activo;
+\endif
+\if :plan_hoy_bondiola
+\else
+  select 1/0 as el_plato_puesto_a_mano_no_quedo_como_plan_de_hoy;
+\endif
+select pg_temp.debe_fallar('select planificar_plato(jornada_actual() - 1, ' || :guiso || ', 10)', 'Ese día ya pasó');
+select pg_temp.debe_fallar('select planificar_plato(jornada_actual() + 1, (select id from productos where nombre = ''Vacío''), 10)', 'Elegí un plato del día');
+select planificar_plato(jornada_actual() + 1, :guiso, null);
+select planificar_plato(jornada_actual() + 2, :pd1, 20);
+select format('   semana: %s días · mañana %s porciones (sugeridas) · compras: %s', jsonb_array_length(s->'dias'), s->'dias'->1->>'porciones',
+              (select string_agg(c->>'nombre' || ' ' || (c->>'necesita'), ', ') from jsonb_array_elements(s->'compras') c))
+from semana_platos() s;
+select (prevision()->'insumos'->>(select id::text from insumos where nombre = 'Lentejas'))::numeric = 1.8 as prevision_suma \gset
+\if :prevision_suma
+\else
+  select 1/0 as la_lista_de_compras_no_suma_el_plato_planificado;
+\endif
+-- Planificar hoy otro plato lo pone en la carta al toque
+select planificar_plato(jornada_actual(), :guiso, 12);
+select (select activo from productos where id = :guiso) and not (select activo from productos where id = :pd1) as cambio_hoy \gset
+\if :cambio_hoy
+\else
+  select 1/0 as planificar_hoy_no_cambio_la_carta;
+\endif
+-- Si se acabó y lo pausan, no vuelve solo
+update productos set activo = false where id = :guiso;
+select coalesce(aplicar_plato_del_dia(), 'nada') as reaplica \gset
+select case when :'reaplica' = 'nada' and not (select activo from productos where id = :guiso) then '   pausado a mano: queda pausado' else 'ERROR: volvió solo' end;
+select pg_temp.como(:'MOZO');
+select pg_temp.debe_fallar('select planificar_plato(jornada_actual() + 3, ' || :guiso || ', 10)', 'Solo dueños y encargados');
+select pg_temp.debe_fallar('select semana_platos()', 'para dueños y encargados');
+reset role;
 \echo 'TODO BIEN'

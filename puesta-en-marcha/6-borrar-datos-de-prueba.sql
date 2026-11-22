@@ -30,6 +30,9 @@ begin
   delete from pedidos p using datos_prueba d where d.tabla = 'mesas_nuevas' and d.id = p.mesa_id::text;
   delete from mesas m using datos_prueba d where d.tabla = 'mesas_nuevas' and d.id = m.id::text;
   delete from pedido_cambios c using datos_prueba d where d.tabla = 'pedido_cambios' and d.id = c.id::text;
+  if to_regclass('public.platos_semana') is not null then
+    execute $q$delete from platos_semana s using datos_prueba d where d.tabla = 'platos_semana' and d.id = s.fecha::text$q$;
+  end if;
   update mesas m set estado = (a.datos->>'estado')::estado_mesa, abierta = (a.datos->>'abierta')::timestamptz,
                      comensales = (a.datos->>'comensales')::int, mozo_id = (a.datos->>'mozo_id')::uuid
   from datos_prueba d join datos_prueba_antes a on a.tabla = 'mesas' and a.id = d.id
@@ -57,6 +60,8 @@ begin
 
   -- La carta (si la cargó el archivo de prueba) y el personal de prueba
   delete from productos p using datos_prueba d where d.tabla = 'productos' and d.id = p.id::text;
+  delete from categorias c using datos_prueba d where d.tabla = 'categorias' and d.id = c.id::text
+    and not exists (select 1 from productos p where p.categoria_id = c.id);
   delete from insumos i using datos_prueba d where d.tabla = 'insumos' and d.id = i.id::text;
   delete from proveedores p using datos_prueba d where d.tabla = 'proveedores' and d.id = p.id::text;
   delete from auth.users u using datos_prueba d where d.tabla = 'usuarios' and d.id = u.id::text;

@@ -91,7 +91,7 @@ await adm.goto('http://localhost:5173/carta', { waitUntil: 'networkidle' })
 await adm.getByRole('button', { name: 'Nuevo producto' }).click()
 await adm.locator('#pr-nom').fill('Provoleta'); await adm.locator('#pr-precio').fill('8500'); await adm.locator('#pr-cat').selectOption({ label: 'Entradas' })
 await adm.getByRole('button', { name: 'Guardar' }).click(); paso('Producto: ' + await toast(adm))
-await adm.getByRole('row', { name: /Provoleta/ }).getByRole('button', { name: 'Pausar' }).click(); paso('Pausar: ' + await toast(adm))
+await adm.getByRole('row', { name: /Provoleta/ }).last().getByRole('button', { name: 'Pausar' }).click(); paso('Pausar: ' + await toast(adm))
 await adm.goto('http://localhost:5173/admin/configuracion', { waitUntil: 'networkidle' })
 await adm.locator('#cfg-colchon_pct').fill('20'); await adm.getByRole('button', { name: 'Guardar cambios' }).click(); paso('Config: ' + await toast(adm) + ' → ' + sql("select valor from parametros where clave='colchon_pct'"))
 

@@ -34,6 +34,7 @@ const Facturacion = lazy(() => import('./pages/admin/Facturacion'))
 const FacturaPublica = lazy(() => import('./pages/Factura'))
 const Carta = lazy(() => import('./pages/carta/Carta'))
 const MesasQR = lazy(() => import('./pages/carta/MesasQR'))
+const PlatosSemana = lazy(() => import('./pages/carta/PlatosSemana'))
 
 const G: Rol[] = ['admin', 'encargado']
 /** Adónde va cada uno al entrar */
@@ -84,6 +85,7 @@ function Privado() {
         <Route path="facturacion" element={<Solo roles={['admin']}><Facturacion /></Solo>} />
       </Route>
       <Route path="carta" element={<Solo roles={G}><Carta /></Solo>} />
+      <Route path="carta/platos" element={<Solo roles={G}><PlatosSemana /></Solo>} />
       <Route path="carta/mesas" element={<Solo roles={G}><MesasQR /></Solo>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>

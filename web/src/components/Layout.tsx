@@ -61,6 +61,13 @@ export default function Layout() {
     setN({ salon: llamados + qr + listos, cocina, barra, stock, vencidos, reservas })
   }, [gestion])
   useEffect(() => { contar() }, [contar, pathname])
+  // El plato del día planificado para hoy se pone solo en la carta (una vez por jornada)
+  const platoAplicado = useRef('')
+  useEffect(() => {
+    if (platoAplicado.current === jornada()) return
+    platoAplicado.current = jornada()
+    supabase.rpc('aplicar_plato_del_dia').then(() => {}, () => {})
+  }, [pathname])
   useEnVivo(['pedidos', 'llamados', 'reservas'], contar, 30)
 
   useEffect(() => { setAbierto(null) }, [pathname])
@@ -102,6 +109,7 @@ export default function Layout() {
     ] },
     { t: 'Carta y QR', base: ['/carta'], roles: GESTION, items: [
       { to: '/carta', b: 'Carta', s: 'Productos, precios y categorías' },
+      { to: '/carta/platos', b: 'Platos del día', s: 'La semana: qué plato va cada día, porciones y compras' },
       { to: '/carta/mesas', b: 'Mesas y QR', s: 'Las mesas del salón y sus QR para imprimir' },
     ] },
   ]

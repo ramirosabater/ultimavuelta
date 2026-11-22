@@ -6,14 +6,15 @@
 --
 --   Se pega una vez en Supabase → SQL Editor → Run.
 --   Para sacar todo: 6-borrar-datos-de-prueba.sql (deja la base como estaba antes).
---   Antes tienen que estar pegadas las actualizaciones 01 a 05.
+--   Antes tienen que estar pegadas las actualizaciones 01 a 07.
 -- =====================================================================
 
 do $$ begin
   if to_regclass('public.reservas') is null or to_regclass('public.facturas') is null
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tickets' and column_name = 'sin_factura')
-     or to_regprocedure('public.anular_compra(bigint)') is null or to_regclass('public.ticket_pagos') is null then
-    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 05 (carpeta actualizaciones).';
+     or to_regprocedure('public.anular_compra(bigint)') is null or to_regclass('public.ticket_pagos') is null
+     or to_regclass('public.platos_semana') is null then
+    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 07 (carpeta actualizaciones).';
   end if;
   if to_regclass('public.datos_prueba') is not null then
     raise exception 'Los datos de prueba ya están cargados. Para cargarlos de nuevo, primero corré 6-borrar-datos-de-prueba.sql.';
@@ -264,7 +265,38 @@ where c.nombre in ('Parrilla', 'Guarniciones') and not exists (select 1 from pro
 update insumos i set referencia_id = r.id, rinde_coccion = r.rinde_coccion
 from referencias r where lower(r.nombre) = lower(i.nombre) and i.referencia_id is null;
 
--- Lo que agregó la carta
+-- Platos del día de ejemplo (rotan día a día), con sus recetas
+do $$
+declare v_cat bigint := (select id from categorias where nombre = 'Plato del día');
+begin
+  if v_cat is null then
+    insert into categorias (nombre, estacion, orden) values ('Plato del día', 'cocina', 0) returning id into v_cat;
+    insert into datos_prueba values ('categorias', v_cat::text);
+  end if;
+  insert into insumos (nombre, unidad, minimo, costo, merma_pct, proveedor_id)
+  select x.n, x.u, 0, x.c, x.m, (select id from proveedores where nombre = x.p)
+  from (values ('Bondiola de cerdo', 'kg', 9500, 5, 'Carnicería'), ('Lentejas', 'kg', 3000, 0, 'Mayorista'), ('Chorizo colorado', 'kg', 11000, 0, 'Fiambrería'),
+               ('Calabaza', 'kg', 1500, 20, 'Verdulería'), ('Pollo trozado', 'kg', 4800, 25, 'Carnicería'), ('Fideos para lasaña', 'kg', 4200, 0, 'Mayorista')) x(n, u, c, m, p)
+  on conflict (nombre) do nothing;
+  insert into productos (nombre, descripcion, categoria_id, precio, estacion, activo)
+  select x.n, x.d, v_cat, x.pr, 'cocina', false
+  from (values ('Bondiola braseada', 'Con puré de calabaza', 16500), ('Guiso de lentejas', 'Con chorizo colorado y panceta', 12500),
+               ('Lasaña de carne', 'Con salsa bolognesa y muzzarella gratinada', 15500), ('Pollo al verdeo', 'Con papas españolas', 15000)) x(n, d, pr)
+  where not exists (select 1 from productos p where p.nombre = x.n);
+  insert into receta_items (producto_id, insumo_id, cantidad)
+  select p.id, i.id, x.q
+  from (values ('Bondiola braseada', 'Bondiola de cerdo', 0.3), ('Bondiola braseada', 'Calabaza', 0.25), ('Bondiola braseada', 'Crema', 0.03), ('Bondiola braseada', 'Cebolla', 0.05),
+               ('Guiso de lentejas', 'Lentejas', 0.12), ('Guiso de lentejas', 'Chorizo colorado', 0.06), ('Guiso de lentejas', 'Panceta', 0.03), ('Guiso de lentejas', 'Papas', 0.1),
+               ('Guiso de lentejas', 'Cebolla', 0.05), ('Guiso de lentejas', 'Tomate triturado', 0.05),
+               ('Lasaña de carne', 'Fideos para lasaña', 0.12), ('Lasaña de carne', 'Carne picada', 0.15), ('Lasaña de carne', 'Muzzarella', 0.08), ('Lasaña de carne', 'Tomate triturado', 0.12),
+               ('Lasaña de carne', 'Cebolla', 0.05),
+               ('Pollo al verdeo', 'Pollo trozado', 0.45), ('Pollo al verdeo', 'Cebolla de verdeo', 0.04), ('Pollo al verdeo', 'Crema', 0.06), ('Pollo al verdeo', 'Papas', 0.3),
+               ('Pollo al verdeo', 'Aceite', 0.04)) x(prod, ins, q)
+  join productos p on p.nombre = x.prod join insumos i on i.nombre = x.ins
+  on conflict do nothing;
+end $$;
+
+-- Lo que agregó la carta (y los platos del día de ejemplo)
 insert into datos_prueba select 'productos', id::text from productos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'productos');
 insert into datos_prueba select 'insumos', id::text from insumos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'insumos');
 insert into datos_prueba select 'proveedores', id::text from proveedores where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'proveedores');
@@ -286,6 +318,7 @@ declare
   v_hora timestamptz; v_com int; v_mesa int; v_moz uuid; v_sub numeric; v_desc numeric; v_medio text; v_cant int; v_tot numeric;
   v_cocina boolean; v_barra boolean; v_ia bigint; v_ib bigint; v_ta timestamptz; v_tb timestamptz;
   r record; x record; v_cols text; v_vals text; v_sql text; v_mes date; v_freq int; v_f date; v_fac numeric; v_nro int := 1200;
+  v_cat_pdd bigint := (select id from categorias where nombre = 'Plato del día'); v_pdds bigint[]; v_pdd bigint;
 begin
   perform setseed(0.27);
 
@@ -316,7 +349,7 @@ begin
   -- Qué se pide más (el resto de la carta sale con peso 1)
   create temp table pesos on commit drop as
   select p.id producto_id, p.nombre, p.precio, p.estacion,
-         case when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' or c.nombre ilike 'papas%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
+         case when p.categoria_id = v_cat_pdd then 'dia' when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' or c.nombre ilike 'papas%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
          coalesce(w.peso, 1)::numeric peso
   from productos p join categorias c on c.id = p.categoria_id
   left join (values ('Pizza muzzarella', 2.6), ('Fugazzeta', 1.6), ('Napolitana', 1.8), ('Pizza especial', 1.4), ('Pizza rúcula y crudo', 1.3),
@@ -325,7 +358,8 @@ begin
                     ('Papas cheddar, panceta y verdeo', 2.5), ('Papas bravas', 1.5), ('Fernet con cola', 4.0), ('Pinta rubia tirada', 4.0),
                     ('Pinta IPA tirada', 2.5), ('Gin tonic', 2.0), ('Gaseosa', 2.2), ('Agua mineral', 1.5), ('Copa de Malbec', 1.5),
                     ('Botella Malbec de la casa', 1.0), ('Aperol spritz', 1.2), ('Porrón 1 L', 1.5)) w(nombre, peso) on w.nombre = p.nombre
-  where p.activo and p.precio > 0;
+  where (p.activo or p.categoria_id = v_cat_pdd) and p.precio > 0;
+  v_pdds := (select array_agg(producto_id order by producto_id) from pesos where grupo = 'dia');
   create temp table items_t (producto_id bigint, cantidad int) on commit drop;
   create temp table lineas (insumo_id bigint, cantidad numeric, costo numeric) on commit drop;
 
@@ -335,6 +369,7 @@ begin
     v_dow := extract(dow from d)::int;
     n := case v_dow when 0 then 12 when 1 then 0 when 2 then 6 when 3 then 7 when 4 then 10 when 5 then 20 else 24 end;
     n := round(n * (0.85 + 0.3 * random()) * (0.88 + 0.24 * (d - v_ini) / 63.0));
+    v_pdd := case when v_pdds is not null then v_pdds[1 + (d - v_ini) % array_length(v_pdds, 1)] end;   -- el plato del día de esta noche
     if n > 0 then
       insert into jornadas (fecha, apertura, abierta_en, abierta_por) values (d, 50000, (d + time '19:40') at time zone v_z, coalesce(v_enc, v_admin))
       on conflict (fecha) do nothing;
@@ -346,6 +381,7 @@ begin
         for j in 1..greatest(1, round(v_com * 0.8 + random() - 0.5)::int) loop
           insert into items_t select producto_id, case when nombre ilike 'empanada%' then 2 + floor(random() * 3)::int else 1 end from pesos where grupo = 'plato' order by -ln(1 - random()) / peso limit 1;
         end loop;
+        if v_pdd is not null and random() < 0.4 then insert into items_t values (v_pdd, 1 + floor(random() * v_com * 0.4)::int); end if;
         for j in 1..floor(v_com * 0.45 + random())::int loop insert into items_t select producto_id, 1 from pesos where grupo = 'guarni' order by -ln(1 - random()) / peso limit 1; end loop;
         for j in 1..floor(v_com * 0.25 + random() * 0.8)::int loop insert into items_t select producto_id, 1 from pesos where grupo = 'postre' order by -ln(1 - random()) / peso limit 1; end loop;
         for j in 1..greatest(1, round(v_com * 1.6 + random() * 2)::int) loop insert into items_t select producto_id, 1 from pesos where grupo = 'bebida' order by -ln(1 - random()) / peso limit 1; end loop;
@@ -389,6 +425,19 @@ begin
     end if;
     d := d + 1;
   end loop;
+
+  -- ------------------------------------------------------------- semana de platos del día: lo que hubo y lo planificado
+  if v_pdds is not null then
+    for k in -21..6 loop
+      d := v_hoy + k;
+      continue when dia_cerrado(d) or exists (select 1 from platos_semana where fecha = d);
+      v_pdd := v_pdds[1 + (d - v_ini) % array_length(v_pdds, 1)];
+      insert into platos_semana (fecha, producto_id, porciones, aplicado, usuario_id)
+      values (d, v_pdd, greatest(6, coalesce(ceil((select sum(ti.cantidad) from ticket_items ti join tickets t2 on t2.id = ti.ticket_id where t2.jornada = d and ti.producto_id = v_pdd) * 1.15), porciones_plato_sugeridas(d))),
+              k < 0, coalesce(v_enc, v_admin));
+      insert into datos_prueba values ('platos_semana', d::text);
+    end loop;
+  end if;
 
   -- ------------------------------------------------------------- compras de cada semana, por proveedor
   for k in 0..8 loop
