@@ -144,14 +144,14 @@ from (values
   ('Pizza rúcula y crudo', 'Muzzarella, jamón crudo, rúcula y parmesano', 'Pizzas', 21000, true, false, null, 5),
   ('Pizza pera y roquefort', 'Muzzarella, peras y roquefort', 'Pizzas', 20000, true, false, null, 6),
 
-  ('Cheeseburger', 'Medallón de carne con doble cheddar', 'Hamburguesas', 13500, true, false, null, 1),
-  ('Hamburguesa cheddar y panceta', 'Cheddar, panceta, cebolla caramelizada y salsa barbacoa', 'Hamburguesas', 16000, true, false, null, 2),
-  ('Hamburguesa clásica', 'Medallón de carne, queso, lechuga y tomate', 'Hamburguesas', 13000, true, false, null, 3),
-  ('Hamburguesa azul', 'Roquefort, rúcula y cebolla', 'Hamburguesas', 16000, true, false, null, 4),
+  ('Cheeseburger', 'Medallón de carne con doble cheddar. Con papas fritas', 'Hamburguesas', 15000, true, false, null, 1),
+  ('Hamburguesa cheddar y panceta', 'Cheddar, panceta, cebolla caramelizada y salsa barbacoa. Con papas fritas', 'Hamburguesas', 17500, true, false, null, 2),
+  ('Hamburguesa clásica', 'Medallón de carne, queso, lechuga y tomate. Con papas fritas', 'Hamburguesas', 14500, true, false, null, 3),
+  ('Hamburguesa azul', 'Roquefort, rúcula y cebolla. Con papas fritas', 'Hamburguesas', 17500, true, false, null, 4),
 
-  ('Sándwich de milanesa de carne', 'Con lechuga, tomate y mayonesa', 'Sándwiches', 15000, true, false, null, 1),
-  ('Sándwich de milanesa de pollo', 'Con lechuga, tomate y mayonesa', 'Sándwiches', 14000, true, false, null, 2),
-  ('Sándwich vegetariano', 'Berenjenas grilladas, rúcula y queso', 'Sándwiches', 12500, false, false, null, 3),
+  ('Sándwich de milanesa de carne', 'Con lechuga, tomate y mayonesa. Con papas fritas', 'Sándwiches', 16500, true, false, null, 1),
+  ('Sándwich de milanesa de pollo', 'Con lechuga, tomate y mayonesa. Con papas fritas', 'Sándwiches', 15500, true, false, null, 2),
+  ('Sándwich vegetariano', 'Berenjenas grilladas, rúcula y queso. Con papas fritas', 'Sándwiches', 14000, true, false, null, 3),
 
   ('Papas cheddar, panceta y verdeo', null, 'Papas', 11000, true, false, null, 1),
   ('Papas 4 quesos', 'Muzzarella, roquefort, parmesano y cheddar', 'Papas', 11500, true, false, null, 2),
@@ -206,24 +206,28 @@ from (values
   ('Pizza pera y roquefort', 'Harina', 0.3), ('Pizza pera y roquefort', 'Levadura', 0.006), ('Pizza pera y roquefort', 'Aceite', 0.02),
   ('Pizza pera y roquefort', 'Muzzarella', 0.3), ('Pizza pera y roquefort', 'Peras', 0.25), ('Pizza pera y roquefort', 'Queso roquefort', 0.1),
 
-  -- Hamburguesas: medallón de 180 g
-  ('Cheeseburger', 'Pan de hamburguesa', 1), ('Cheeseburger', 'Carne picada', 0.18), ('Cheeseburger', 'Queso cheddar en fetas', 0.04),
+  -- Hamburguesas: medallón de 180 g, con papas fritas
+  ('Cheeseburger', 'Pan de hamburguesa', 1), ('Cheeseburger', 'Carne picada', 0.18), ('Cheeseburger', 'Queso cheddar en fetas', 0.04), ('Cheeseburger', 'Papas', 0.25), ('Cheeseburger', 'Aceite', 0.04),
   ('Hamburguesa cheddar y panceta', 'Pan de hamburguesa', 1), ('Hamburguesa cheddar y panceta', 'Carne picada', 0.18),
   ('Hamburguesa cheddar y panceta', 'Queso cheddar en fetas', 0.04), ('Hamburguesa cheddar y panceta', 'Panceta', 0.04),
   ('Hamburguesa cheddar y panceta', 'Cebolla', 0.08), ('Hamburguesa cheddar y panceta', 'Azúcar', 0.01), ('Hamburguesa cheddar y panceta', 'Salsa barbacoa', 0.03),
+  ('Hamburguesa cheddar y panceta', 'Papas', 0.25), ('Hamburguesa cheddar y panceta', 'Aceite', 0.04),
   ('Hamburguesa clásica', 'Pan de hamburguesa', 1), ('Hamburguesa clásica', 'Carne picada', 0.18), ('Hamburguesa clásica', 'Queso cheddar en fetas', 0.02),
   ('Hamburguesa clásica', 'Lechuga', 0.03), ('Hamburguesa clásica', 'Tomate', 0.05), ('Hamburguesa clásica', 'Mayonesa', 0.02),
+  ('Hamburguesa clásica', 'Papas', 0.25), ('Hamburguesa clásica', 'Aceite', 0.04),
   ('Hamburguesa azul', 'Pan de hamburguesa', 1), ('Hamburguesa azul', 'Carne picada', 0.18), ('Hamburguesa azul', 'Queso roquefort', 0.04),
   ('Hamburguesa azul', 'Rúcula', 0.03), ('Hamburguesa azul', 'Cebolla', 0.05),
+  ('Hamburguesa azul', 'Papas', 0.25), ('Hamburguesa azul', 'Aceite', 0.04),
 
-  ('Sándwich de milanesa de carne', 'Pan de sándwich', 1), ('Sándwich de milanesa de carne', 'Carne para milanesa', 0.18),
-  ('Sándwich de milanesa de carne', 'Pan rallado', 0.04), ('Sándwich de milanesa de carne', 'Huevos', 0.5), ('Sándwich de milanesa de carne', 'Aceite', 0.05),
+  -- Sándwiches, con papas fritas (el aceite incluye el de las papas)
+  ('Sándwich de milanesa de carne', 'Pan de sándwich', 1), ('Sándwich de milanesa de carne', 'Papas', 0.25), ('Sándwich de milanesa de carne', 'Carne para milanesa', 0.18),
+  ('Sándwich de milanesa de carne', 'Pan rallado', 0.04), ('Sándwich de milanesa de carne', 'Huevos', 0.5), ('Sándwich de milanesa de carne', 'Aceite', 0.09),
   ('Sándwich de milanesa de carne', 'Lechuga', 0.03), ('Sándwich de milanesa de carne', 'Tomate', 0.05), ('Sándwich de milanesa de carne', 'Mayonesa', 0.02),
-  ('Sándwich de milanesa de pollo', 'Pan de sándwich', 1), ('Sándwich de milanesa de pollo', 'Pechuga de pollo', 0.18),
-  ('Sándwich de milanesa de pollo', 'Pan rallado', 0.04), ('Sándwich de milanesa de pollo', 'Huevos', 0.5), ('Sándwich de milanesa de pollo', 'Aceite', 0.05),
+  ('Sándwich de milanesa de pollo', 'Pan de sándwich', 1), ('Sándwich de milanesa de pollo', 'Papas', 0.25), ('Sándwich de milanesa de pollo', 'Pechuga de pollo', 0.18),
+  ('Sándwich de milanesa de pollo', 'Pan rallado', 0.04), ('Sándwich de milanesa de pollo', 'Huevos', 0.5), ('Sándwich de milanesa de pollo', 'Aceite', 0.09),
   ('Sándwich de milanesa de pollo', 'Lechuga', 0.03), ('Sándwich de milanesa de pollo', 'Tomate', 0.05), ('Sándwich de milanesa de pollo', 'Mayonesa', 0.02),
-  ('Sándwich vegetariano', 'Pan de sándwich', 1), ('Sándwich vegetariano', 'Berenjena', 0.15), ('Sándwich vegetariano', 'Rúcula', 0.03),
-  ('Sándwich vegetariano', 'Muzzarella', 0.06), ('Sándwich vegetariano', 'Aceite', 0.02),
+  ('Sándwich vegetariano', 'Pan de sándwich', 1), ('Sándwich vegetariano', 'Papas', 0.25), ('Sándwich vegetariano', 'Berenjena', 0.15), ('Sándwich vegetariano', 'Rúcula', 0.03),
+  ('Sándwich vegetariano', 'Muzzarella', 0.06), ('Sándwich vegetariano', 'Aceite', 0.06),
 
   ('Papas cheddar, panceta y verdeo', 'Papas', 0.4), ('Papas cheddar, panceta y verdeo', 'Aceite', 0.06),
   ('Papas cheddar, panceta y verdeo', 'Queso cheddar para salsa', 0.08), ('Papas cheddar, panceta y verdeo', 'Panceta', 0.05),
@@ -239,6 +243,9 @@ from (values
 
   ('Flan', 'Leche', 0.1), ('Flan', 'Huevos', 1), ('Flan', 'Azúcar', 0.03), ('Flan', 'Dulce de leche', 0.04), ('Flan', 'Crema', 0.03),
   ('Helado', 'Helado', 0.2),
+  -- Especial de la casa: estimado como un postre casero promedio, hasta que definan cuál es
+  ('Especial de la casa', 'Leche', 0.08), ('Especial de la casa', 'Huevos', 1), ('Especial de la casa', 'Azúcar', 0.04),
+  ('Especial de la casa', 'Harina', 0.03), ('Especial de la casa', 'Dulce de leche', 0.05), ('Especial de la casa', 'Crema', 0.05),
 
   ('Fernet con cola', 'Fernet', 70), ('Fernet con cola', 'Cola', 230), ('Fernet con cola', 'Hielo', 0.2),
   ('Gin tonic', 'Gin', 60), ('Gin tonic', 'Tónica', 200), ('Gin tonic', 'Limones', 0.25), ('Gin tonic', 'Hielo', 0.2),

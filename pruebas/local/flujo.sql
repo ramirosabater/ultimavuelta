@@ -272,4 +272,34 @@ select '   ventas por medio: ' || (tablero_ventas(jornada_actual() - 30, jornada
 select sacar_item((select i.id from pedido_items i join pedidos p on p.id = i.pedido_id where p.mesa_id = :aparte and p.ticket_id is null limit 1), null, 'Se fue sin comer');
 select case when (select activa from mesas where id = :aparte) then 'ERROR: la cuenta aparte vacía sigue abierta' else '   la cuenta aparte vacía se cerró sola' end;
 reset role;
+
+\echo '13. Plato del día y recetas con artículos nuevos'
+select pg_temp.como(:'MOZO');
+select pg_temp.debe_fallar($$select guardar_plato_del_dia('Guiso', null, 9000, '[]')$$, 'Solo dueños y encargados');
+select pg_temp.como(:'ADMIN');
+select pg_temp.debe_fallar($$select guardar_plato_del_dia('Guiso', null, null, '[]')$$, 'Poné el precio');
+select pg_temp.debe_fallar($$select guardar_plato_del_dia('Guiso', null, 9000, '[{"nuevo": {"nombre": " "}, "cantidad": 1}]')$$, 'Poné el nombre de cada artículo nuevo');
+select guardar_plato_del_dia('Bondiola braseada', 'Con puré', 16000,
+  jsonb_build_array(jsonb_build_object('nuevo', jsonb_build_object('nombre', 'bondiola de cerdo', 'unidad', 'kg', 'costo', 9000, 'merma_pct', 5), 'cantidad', 0.25),
+                    jsonb_build_object('nuevo', jsonb_build_object('nombre', 'PAPAS', 'unidad', 'kg', 'costo', 1), 'cantidad', 0.3),
+                    jsonb_build_object('insumo_id', (select id from insumos where nombre = 'Aceite'), 'cantidad', 0.02))) as pd1 \gset
+select format('   plato del día %s: receta %s · costo %s', p.nombre, (select string_agg(i.nombre || ' ' || r.cantidad, ', ' order by i.nombre) from receta_items r join insumos i on i.id = r.insumo_id where r.producto_id = p.id), round(costo_receta(p.id)))
+from productos p where id = :pd1;
+select (select count(*) from insumos where lower(nombre) = 'papas') = 1 and (select nombre from insumos where lower(nombre) = 'bondiola de cerdo') = 'Bondiola de cerdo'
+       and (select costo from insumos where nombre = 'Papas') <> 1 as reuso_bien \gset
+\if :reuso_bien
+\else
+  select 1/0 as el_articulo_nuevo_duplico_o_piso_uno_existente;
+\endif
+select guardar_plato_del_dia('Lasaña', null, 15000, '[{"nuevo": {"nombre": "Lasaña armada", "unidad": "u.", "costo": 4000}, "cantidad": 1}]') as pd2 \gset
+select (select activo from productos where id = :pd1) as sigue_la_bondiola \gset
+\if :sigue_la_bondiola
+  select 1/0 as no_se_pauso_el_plato_anterior;
+\endif
+-- Volver a poner la bondiola otro día, con su receta (sin mandar receta)
+select guardar_plato_del_dia('Bondiola braseada', 'Con puré', 17000, null, true, :pd1) = :pd1 as mismo \gset
+select format('   vuelve la bondiola: activa %s, precio %s, %s ingredientes · lasaña activa %s', p.activo, p.precio, (select count(*) from receta_items where producto_id = p.id),
+              (select activo from productos where id = :pd2)) from productos p where id = :pd1;
+select format('   la categoría: %s (orden %s) con %s platos guardados', c.nombre, c.orden, (select count(*) from productos where categoria_id = c.id)) from categorias c where nombre = 'Plato del día';
+reset role;
 \echo 'TODO BIEN'

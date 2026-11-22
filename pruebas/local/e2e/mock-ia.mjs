@@ -13,6 +13,13 @@ createServer((req, res) => {
   let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => {
     const p = JSON.parse(b || '{}')
     res.writeHead(200, cors)
+    if (p.tipo === 'receta') {   // una receta fija: un artículo nuevo y dos que ya existen (por nombre)
+      res.end(JSON.stringify({ porcion: `1 plato de ${p.nombre}`, items: [
+        { insumo_id: null, nombre: 'Bondiola de cerdo', unidad: 'kg', cantidad: 0.25, costo: 9000, merma_pct: 5 },
+        { insumo_id: null, nombre: 'Papas', unidad: 'kg', cantidad: 0.3, costo: 900, merma_pct: 20 },
+        { insumo_id: null, nombre: 'Aceite', unidad: 'L', cantidad: 0.02, costo: 3200, merma_pct: 0 }] }))
+      return
+    }
     res.end(JSON.stringify(p.tipo === 'pregunta' ? { texto: `(prueba) Me preguntaste: "${p.pregunta}" desde ${p.pantalla}.` } : { error: 'solo preguntas en la prueba' }))
   })
 }).listen(Number(process.env.PORT || 54331), () => console.log('mock funciones listo'))

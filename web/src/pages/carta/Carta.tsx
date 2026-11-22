@@ -6,6 +6,7 @@ import type { Categoria, Estacion, Insumo, Producto, RecetaItem } from '../../li
 import { SubNav } from '../../components/Layout'
 import { costoPorcion, pillCosto } from '../../components/stock'
 import { Cabeza, Modal, Pill, useAccion } from '../../components/ui'
+import { costoFilas, EstimarReceta, FilasReceta, filasDe, filaVacia, itemsFilas, type FilaReceta } from '../../components/receta'
 
 export const SubNavCarta = () => <SubNav items={[['/carta', 'Carta'], ['/carta/mesas', 'Mesas y QR']]} />
 const EST: Record<Estacion, string> = { cocina: 'Parrilla / cocina', barra: 'Barra' }
@@ -22,7 +23,7 @@ export default function Carta() {
     return { cats, prods, rec, ins, objetivo: (Number(p.costo_objetivo) || 35) / 100 }
   })
   const [buscar, setBuscar] = useState('')
-  const [ventana, setVentana] = useState<null | { p: Producto | null; cat?: number } | { c: Categoria | null } | { stock: Producto }>(null)
+  const [ventana, setVentana] = useState<null | { p: Producto | null; cat?: number } | { c: Categoria | null } | { stock: Producto } | { dia: true }>(null)
   const { correr } = useAccion()
   if (d.error) return <div className="aviso bad">{d.error}</div>
   if (!d.datos) return <><SubNavCarta /><p className="cargando">Cargando la carta…</p></>
@@ -35,7 +36,8 @@ export default function Carta() {
   return <>
     <Cabeza etiqueta="Carta y QR" titulo="Carta">
       <button className="btn" onClick={() => setVentana({ c: null })}>Nueva categoría</button>
-      <button className="btn pri" data-ayuda="nuevo-producto" onClick={() => setVentana({ p: null })}>Nuevo producto</button></Cabeza>
+      <button className="btn" data-ayuda="nuevo-producto" onClick={() => setVentana({ p: null })}>Nuevo producto</button>
+      <button className="btn pri" data-ayuda="plato-del-dia" onClick={() => setVentana({ dia: true })}>Plato del día</button></Cabeza>
     <SubNavCarta />
     <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '72ch' }}>Lo que se ve en la carta del QR y en la pantalla del mozo. <b>Pausar</b> saca un producto al toque (se acabó el vacío) sin borrarlo.</p>
     <input id="carta-buscar" type="search" placeholder="Buscar…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ marginBottom: 14 }} />
@@ -54,6 +56,7 @@ export default function Carta() {
       </section> })}
     {ventana && 'p' in ventana && <ProductoForm prod={ventana.p} cats={cats} catInicial={ventana.cat} onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana && 'c' in ventana && <CategoriaForm cat={ventana.c} onCerrar={() => setVentana(null)} onListo={listo} />}
+    {ventana && 'dia' in ventana && <PlatoDelDia cats={cats} prods={prods} rec={rec} ins={ins} objetivo={objetivo} onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana && 'stock' in ventana && <StockProducto prod={ventana.stock} onCerrar={() => setVentana(null)} onListo={listo} />}
   </>
 }
@@ -118,5 +121,61 @@ function StockProducto({ prod, onCerrar, onListo }: { prod: Producto; onCerrar: 
     <p style={{ marginTop: 0 }}>Hay <b>{num(prod.stock)}</b> unidades según la app.</p>
     <div className="chips" style={{ marginBottom: 10 }}><button className="chip" aria-pressed={modo === 'ingreso'} onClick={() => setModo('ingreso')}>Entraron</button><button className="chip" aria-pressed={modo === 'conteo'} onClick={() => setModo('conteo')}>Conté y hay</button></div>
     <label className="campo">{modo === 'ingreso' ? 'Cuántas entraron' : 'Cuántas hay'}<input id="sp-n" type="number" min={0} inputMode="numeric" value={n} onChange={(e) => setN(e.target.value)} autoFocus /></label>
+  </Modal>
+}
+
+/** Plato del día: nombre, qué lleva y precio. La receta la calcula Chichito (o se carga a mano). */
+function PlatoDelDia({ cats, prods, rec, ins, objetivo, onCerrar, onListo }: { cats: Categoria[]; prods: Producto[]; rec: RecetaItem[]; ins: Insumo[]; objetivo: number; onCerrar: () => void; onListo: () => void }) {
+  const cat = cats.find((c) => c.nombre === 'Plato del día')
+  const anteriores = cat ? prods.filter((p) => p.categoria_id === cat.id).sort((a, b) => Number(b.activo) - Number(a.activo) || b.id - a.id) : []
+  const [desde, setDesde] = useState<Producto | null>(null)
+  const [f, setF] = useState({ nombre: '', descripcion: '', precio: '' })
+  const [filas, setFilas] = useState<FilaReceta[]>([filaVacia()])
+  const [porcion, setPorcion] = useState<string | null>(null)
+  const [sacar, setSacar] = useState(true)
+  const [err, setErr] = useState('')
+  const { correr, ocupado } = useAccion()
+  const costo = costoFilas(filas, ins), precio = Number(f.precio)
+  const fc = precio > 0 && costo > 0 ? costo / precio : null
+  const sugerido = costo > 0 ? Math.ceil(costo / objetivo / 500) * 500 : null
+  const hoy = anteriores.find((p) => p.activo)
+
+  function elegir(p: Producto) {
+    setDesde(p); setPorcion(null); setErr('')
+    setF({ nombre: p.nombre, descripcion: p.descripcion ?? '', precio: String(p.precio) })
+    setFilas(filasDe(rec.filter((r) => r.producto_id === p.id)))
+  }
+  function nuevo() { setDesde(null); setPorcion(null); setF({ nombre: '', descripcion: '', precio: '' }); setFilas([filaVacia()]) }
+  async function guardar() {
+    if (f.nombre.trim().length < 2) { setErr('Poné el nombre del plato.'); return }
+    if (!(precio > 0)) { setErr('Poné el precio.'); return }
+    const { items, error } = itemsFilas(filas)
+    if (error) { setErr(error); return }
+    if (!items.length) { setErr('Falta la receta: tocá "Que Chichito calcule la receta" o cargala a mano.'); return }
+    if (await correr(() => rpc('guardar_plato_del_dia', { p_nombre: f.nombre, p_descripcion: f.descripcion, p_precio: precio, p_items: items, p_sacar_anterior: sacar, p_producto: desde?.id ?? null }),
+      `${f.nombre.trim()}: es el plato del día`)) onListo()
+  }
+  return <Modal titulo="Plato del día" onCerrar={onCerrar} pie={<>
+    <div className="grow"><div className="label">Costo por porción</div><div className="fila"><span className="mono" style={{ fontWeight: 600, fontSize: 18 }}>{plata(costo)}</span>{fc != null && pillCosto(fc, objetivo)}</div></div>
+    <button className="btn pri" id="pd-guardar" disabled={ocupado} onClick={guardar}>Poner en la carta</button></>}>
+    {anteriores.length > 0 && <div>
+      <div className="label">Volver a poner uno que ya hicieron (con su receta)</div>
+      <div className="chips">
+        <button className="chip" aria-pressed={!desde} onClick={nuevo}>＋ Uno nuevo</button>
+        {anteriores.slice(0, 12).map((p) => <button key={p.id} className="chip" aria-pressed={desde?.id === p.id} onClick={() => elegir(p)}>{p.nombre}{p.activo ? ' · hoy' : ''}</button>)}
+      </div>
+    </div>}
+    <label className="campo">Nombre<input id="pd-nom" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} placeholder="Bondiola braseada" autoFocus /></label>
+    <label className="campo">Qué lleva (se ve en el QR y ayuda a calcular la receta)<input id="pd-desc" value={f.descripcion} onChange={(e) => setF({ ...f, descripcion: e.target.value })} placeholder="Con puré de calabaza y salsa de hongos" /></label>
+    <EstimarReceta nombre={f.nombre} descripcion={f.descripcion} insumos={ins} onFilas={(x, p) => { setFilas(x); setPorcion(p) }} />
+    {porcion && <div className="notice" style={{ fontSize: 13 }}>Chichito la calculó para <b>{porcion}</b>. Revisá las cantidades: los artículos nuevos se crean con stock en cero y el costo se corrige solo con la primera compra.</div>}
+    <FilasReceta filas={filas} setFilas={setFilas} insumos={ins} />
+    <div className="two">
+      <label className="campo">Precio ($)<input id="pd-precio" type="number" step="any" min={0} inputMode="decimal" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })} /></label>
+      {sugerido != null && <div className="campo"><span>Precio sugerido</span><div className="fila"><span className="mono">{plata(sugerido)}</span><span className="muted" style={{ fontSize: 12 }}>({Math.round(objetivo * 100)} % de costo)</span>
+        <button className="btn sm" onClick={() => setF({ ...f, precio: String(sugerido) })}>Usar</button></div></div>}
+    </div>
+    {hoy && hoy.id !== desde?.id && <label className="check"><input type="checkbox" id="pd-sacar" checked={sacar} onChange={(e) => setSacar(e.target.checked)} /> Sacar de la carta {hoy.nombre} (queda guardado para otro día)</label>}
+    {err && <div className="err">{err}</div>}
   </Modal>
 }

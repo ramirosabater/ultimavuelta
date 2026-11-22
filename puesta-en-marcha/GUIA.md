@@ -55,6 +55,7 @@ y `supabase secrets set ...` desde la carpeta del repo.)
 3. **Administración → Cuentas**: saldo inicial de la caja, el banco y Mercado Pago. Revisá a qué cuenta entra cada medio de pago.
 4. **Administración → Proveedores** y **Stock → Artículos**: lo que compran, con costo, mínimo y merma de limpieza.
 5. **Carta y QR → Carta**: productos y precios. **Stock → Recetas**: cuánto lleva cada plato (así sale el costo).
+   **Plato del día** (en Carta): nombre, qué lleva y precio; "Que Chichito calcule la receta" pone las cantidades (revisalas) y sugiere un precio. El del día anterior se pausa y queda para volver a ponerlo con un toque. El mismo botón está al editar cualquier receta.
 6. **Carta y QR → Mesas y QR**: ajustá las mesas e **imprimí los QR**.
 7. **Administración → Usuarios**: invitá a los mozos, la parrilla y la barra. A cada uno le llega un mail para elegir su contraseña.
 8. **Administración → Configuración → Reservas**: horarios, lugares por horario, máximo de personas y el WhatsApp del local.
@@ -73,6 +74,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | `03-sin-factura.sql` | Cobrar sin factura: la venta queda marcada y no aparece como pendiente |
 | `04-anular-compra.sql` | Compras: cargar a mano con varios artículos y anular una compra mal cargada |
 | `05-pedidos.sql` | Pedidos: para llevar, delivery y barra; sacar, invitar o pasar productos; separar la cuenta; cobrar con varios medios y propina |
+| `06-plato-del-dia.sql` | Plato del día con receta calculada por Chichito; recetas con artículos nuevos (después, volver a publicar la función `ia` con `funciones/ia.ts`) |
 
 ## Datos de prueba (para mostrar la app)
 - `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de `3-carta.sql`. Antes tienen que estar pegadas las actualizaciones 01 a 05.

@@ -3,7 +3,8 @@
 // Función "ia": lo que la app le pide a Claude (API de Anthropic). La clave queda en el servidor.
 //   tipo "factura":  lee una foto o PDF de una factura y devuelve las líneas asociadas a los artículos. Solo gestión.
 //   tipo "pregunta": Chichito responde una pregunta con los datos del local que puede ver quien pregunta.
-// Secretos: ANTHROPIC_API_KEY. Opcionales: IA_MODELO_FACTURA, IA_MODELO_PREGUNTAS.
+//   tipo "receta":   estima la receta de un plato (cantidades por porción) con los artículos del local. Solo gestión.
+// Secretos: ANTHROPIC_API_KEY. Opcionales: IA_MODELO_FACTURA, IA_MODELO_PREGUNTAS, IA_MODELO_RECETA.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 // ---- supabase/functions/_compartido/comun.ts ----
@@ -50,6 +51,7 @@ const esGestion = (rol: Rol) => rol === 'admin' || rol === 'encargado'
 const API = () => env('ANTHROPIC_URL', 'https://api.anthropic.com') + '/v1/messages'
 const MODELO_FACTURA = () => env('IA_MODELO_FACTURA', 'claude-sonnet-5-5')
 const MODELO_PREGUNTAS = () => env('IA_MODELO_PREGUNTAS', 'claude-haiku-5-5')
+const MODELO_RECETA = () => env('IA_MODELO_RECETA', 'claude-sonnet-5-5')
 const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_BYTES = 12 * 1024 * 1024
 
@@ -133,6 +135,53 @@ Respondé solo con este JSON:
   }
 }
 
+// ------------------------------------------------------------------ receta
+const UNIDADES = ['kg', 'g', 'L', 'ml', 'u.', 'atados']
+interface LineaReceta { iid?: number | null; nombre?: string; unidad?: string; cantidad?: number; costo?: number | null; merma_pct?: number | null }
+
+async function estimarReceta(b: { nombre?: string; descripcion?: string }) {
+  const nombre = (b.nombre ?? '').trim().slice(0, 120), descripcion = (b.descripcion ?? '').trim().slice(0, 400)
+  if (!nombre) throw new Error('Poné el nombre del plato.')
+  const db = admin()
+  const { data: insumos } = await db.from('insumos').select('id, nombre, unidad, costo, merma_pct').eq('activo', true).order('nombre')
+  const lista = (insumos ?? []).map((i) => `${i.id} | ${i.nombre} | ${i.unidad} | $${Math.round(Number(i.costo) * 100) / 100} por ${i.unidad}`).join('\n')
+
+  const system = 'Sos jefe de cocina de un bar de Rada Tilly (Chubut, Argentina) y estimás recetas para costear platos. Devolvés solo JSON válido, sin comentarios.'
+  const pedido = `Plato: ${nombre}${descripcion ? `\nQué lleva: ${descripcion}` : ''}
+
+Estimá los ingredientes de UNA porción como se sirve en un bar (porción normal, ni chica ni abundante). Incluí lo que se ve en el plato, la guarnición si la menciona y lo que se gasta para cocinarlo (aceite de fritura, rebozado, masa). Dejá afuera sal, pimienta y lo que pese menos de 2 g.
+
+Artículos que ya maneja el local (id | nombre | unidad | costo):
+${lista || '(todavía no hay artículos)'}
+
+Para cada ingrediente:
+- iid: el id del artículo del local si es el mismo ingrediente (o uno equivalente), si no null.
+- nombre: el nombre del artículo del local, o uno corto y genérico si es nuevo ("Bondiola de cerdo", "Calabaza").
+- unidad: la del artículo del local; si es nuevo, una de ${UNIDADES.join(', ')} (lo que se compra por peso en kg, los líquidos en L, lo que se cuenta en u.).
+- cantidad: en esa unidad, CRUDA Y LIMPIA (antes de cocinar, sin hueso ni cáscara). Ej.: 0,25 kg de carne cruda, 0,02 L de aceite, 1 u. de pan.
+- costo: solo si es nuevo, precio estimado en pesos argentinos de hoy por unidad comprando a un mayorista o proveedor de la zona; si no, null.
+- merma_pct: solo si es nuevo, % que se tira al limpiar (cáscara, hueso, grasa); si no, null.
+
+Respondé solo con este JSON:
+{"porcion": "texto muy corto con el tamaño de la porción", "items": [{"iid": number|null, "nombre": string, "unidad": string, "cantidad": number, "costo": number|null, "merma_pct": number|null}]}`
+
+  const texto = await claude(MODELO_RECETA(), system, [{ type: 'text', text: pedido }], 2000)
+  const r = sacarJson(texto) as { porcion?: string; items?: LineaReceta[] }
+  const porId = new Map((insumos ?? []).map((i) => [Number(i.id), i]))
+  const porNombre = new Map((insumos ?? []).map((i) => [String(i.nombre).toLowerCase(), i]))
+  const items = (r.items ?? []).slice(0, 30).map((x) => {
+    const ins = (x.iid != null ? porId.get(Number(x.iid)) : undefined) ?? porNombre.get(String(x.nombre ?? '').trim().toLowerCase())
+    const cantidad = Number(x.cantidad)
+    if (!(cantidad > 0)) return null
+    if (ins) return { insumo_id: Number(ins.id), nombre: String(ins.nombre), unidad: String(ins.unidad), cantidad }
+    const unidad = UNIDADES.includes(String(x.unidad)) ? String(x.unidad) : 'kg'
+    return { insumo_id: null, nombre: String(x.nombre ?? '').trim().slice(0, 80), unidad, cantidad,
+             costo: Math.max(0, Number(x.costo) || 0), merma_pct: Math.min(90, Math.max(0, Number(x.merma_pct) || 0)) }
+  }).filter((x) => x && x.nombre)
+  if (!items.length) throw new Error('No pude estimar la receta. Probá describir mejor el plato.')
+  return { porcion: String(r.porcion ?? '').slice(0, 120) || null, items }
+}
+
 // ------------------------------------------------------------------ pregunta
 const MAPA = `Secciones de la app (menú de arriba):
 - Mesas (/mesas): el salón. Tocar una mesa libre para abrirla, "Agregar pedido" para cargar la comanda, confirmar los pedidos que llegan por QR, "Pidió la cuenta", "Cobrar", pasar a otra mesa.
@@ -143,7 +192,7 @@ const MAPA = `Secciones de la app (menú de arriba):
 - Tableros: Resumen, Ventas y servicio, Costos y desperdicio, Finanzas, con filtros desde/hasta, plato, mozo, día, medio de pago, artículo y proveedor.
 - Administración: Proveedores, Gastos (por pagar y pagar), Cuentas (caja, banco, Mercado Pago, transferencias), Usuarios (solo dueños), Facturación (solo dueños: factura electrónica con ARCA, Factura C de monotributo; datos del bar, certificado, probar conexión y activar), Configuración.
 - Facturas: al cobrar una mesa, "Cobrar y facturar" hace la Factura C con CAE y QR, para imprimir o mandar por WhatsApp. Desde $10.000.000 hay que cargar el DNI o CUIT del cliente. En Caja, la columna Factura muestra cada una; las que no salieron (ARCA caído) se hacen con "Facturar" o "Reintentar". "Anular" hace la nota de crédito.
-- Carta y QR: productos, precios, categorías, pausar lo agotado, mesas y QR para imprimir.`
+- Carta y QR: productos, precios, categorías, pausar lo agotado, mesas y QR para imprimir. "Plato del día": nombre, qué lleva y precio; "Que Chichito calcule la receta" estima las cantidades (también en Stock → Recetas, al editar cualquier receta); el del día anterior se pausa y queda guardado para volver a ponerlo.`
 
 async function responder(req: Request, b: { pregunta?: string; pantalla?: string }) {
   const pregunta = (b.pregunta ?? '').trim().slice(0, 600)
@@ -167,11 +216,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   const quien = await quienLlama(req)
   if (!quien) return json({ error: 'Entrá con tu usuario.' }, 401)
-  const b = await req.json().catch(() => ({})) as { tipo?: string; archivo?: string; media_type?: string; pregunta?: string; pantalla?: string }
+  const b = await req.json().catch(() => ({})) as { tipo?: string; archivo?: string; media_type?: string; pregunta?: string; pantalla?: string; nombre?: string; descripcion?: string }
   try {
     if (b.tipo === 'factura') {
       if (!esGestion(quien.rol)) return json({ error: 'Solo dueños y encargados cargan facturas.' }, 403)
       return json(await leerFactura(b))
+    }
+    if (b.tipo === 'receta') {
+      if (!esGestion(quien.rol)) return json({ error: 'Solo dueños y encargados cargan recetas.' }, 403)
+      return json(await estimarReceta(b))
     }
     if (b.tipo === 'pregunta') return json(await responder(req, b))
     return json({ error: 'Pedido desconocido.' }, 400)
