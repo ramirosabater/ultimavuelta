@@ -2,7 +2,7 @@
 -- Última Vuelta · BORRAR LOS DATOS DE PRUEBA
 --   Saca todo lo que cargó 5-datos-de-prueba.sql y deja la base como estaba antes:
 --   ventas, caja, compras, gastos, mermas, conteos, rendimientos, reservas, personal de prueba,
---   y la carta de ejemplo si la había cargado ese archivo. Vuelve el stock, los costos y las cuentas.
+--   y la carta si la había cargado ese archivo. Vuelve el stock, los costos y las cuentas.
 --
 --   Lo que ustedes hayan cargado a mano durante la prueba (una mesa nueva que cobraron, un gasto)
 --   no se borra solo: revisalo en la app después.
@@ -55,7 +55,7 @@ begin
   update cuentas c set desde = (a.datos->>'desde')::date, saldo_inicial = (a.datos->>'saldo_inicial')::numeric
   from datos_prueba_antes a where a.tabla = 'cuentas' and a.id = c.id::text;
 
-  -- La carta de ejemplo (si la cargó el archivo de prueba) y el personal de prueba
+  -- La carta (si la cargó el archivo de prueba) y el personal de prueba
   delete from productos p using datos_prueba d where d.tabla = 'productos' and d.id = p.id::text;
   delete from insumos i using datos_prueba d where d.tabla = 'insumos' and d.id = i.id::text;
   delete from proveedores p using datos_prueba d where d.tabla = 'proveedores' and d.id = p.id::text;

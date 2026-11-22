@@ -2,7 +2,7 @@
 -- Última Vuelta · DATOS DE PRUEBA (para mostrar la app)
 --   Carga un mes de movimiento inventado: ventas de cada noche, caja, compras, gastos, mermas,
 --   control semanal, rendimientos, reservas y mesas abiertas ahora con comandas en curso.
---   Si la carta está vacía, carga también la carta de ejemplo con sus recetas.
+--   Si la carta está vacía, carga también la carta (3-carta.sql) con sus recetas.
 --
 --   Se pega una vez en Supabase → SQL Editor → Run.
 --   Para sacar todo: 6-borrar-datos-de-prueba.sql (deja la base como estaba antes).
@@ -44,102 +44,202 @@ insert into datos_prueba_antes select 'mesas', id::text, jsonb_build_object('est
 -- Carta de ejemplo (solo agrega lo que falta: si ya cargaron su carta, la respeta)
 -- ---------------------------------------------------------------------
 insert into proveedores (nombre, rubro, plazo_dias) values
-  ('Carnicería', 'Carnes', 7), ('Fiambrería', 'Quesos y fiambres', 0), ('Panadería', 'Panificados', 0),
-  ('Verdulería', 'Frutas y verduras', 0), ('Mayorista', 'Almacén y carbón', 15), ('Hielo', 'Hielo', 0),
+  ('Carnicería', 'Carnes y pollo', 7), ('Fiambrería', 'Quesos y fiambres', 0), ('Panadería', 'Panificados', 0),
+  ('Verdulería', 'Frutas y verduras', 0), ('Mayorista', 'Almacén', 15), ('Heladería', 'Helado', 0), ('Hielo', 'Hielo', 0),
   ('Distribuidora', 'Bebidas', 30), ('Cervecería', 'Cerveza en barril', 15)
 on conflict (nombre) do nothing;
 
+insert into categorias (nombre, estacion, orden) values
+  ('Entradas', 'cocina', 1), ('Pizzas', 'cocina', 2), ('Hamburguesas', 'cocina', 3), ('Sándwiches', 'cocina', 4),
+  ('Papas', 'cocina', 5), ('Ensaladas', 'cocina', 6), ('Postres', 'cocina', 7),
+  ('Tragos', 'barra', 8), ('Cervezas', 'barra', 9), ('Vinos', 'barra', 10), ('Sin alcohol', 'barra', 11)
+on conflict (nombre) do nothing;
+update categorias c set orden = x.orden, activa = true
+from (values ('Entradas', 1), ('Pizzas', 2), ('Hamburguesas', 3), ('Sándwiches', 4), ('Papas', 5), ('Ensaladas', 6), ('Postres', 7),
+             ('Tragos', 8), ('Cervezas', 9), ('Vinos', 10), ('Sin alcohol', 11)) x(nombre, orden)
+where c.nombre = x.nombre;
+
+-- Artículos (unidad · mínimo para la lista de compras · costo estimado · % de merma al limpiar · pack de compra · proveedor)
 insert into insumos (nombre, unidad, cantidad, minimo, costo, merma_pct, pack, pack_nombre, proveedor_id)
-select x.nombre, x.unidad, x.cantidad, x.minimo, x.costo, x.merma, x.pack, x.pack_nombre, (select id from proveedores where nombre = x.prov)
+select x.nombre, x.unidad, 0, x.minimo, x.costo, x.merma, x.pack, x.pack_nombre, (select id from proveedores where nombre = x.prov)
 from (values
-  ('Vacío', 'kg', 18, 6, 9800, 12, null, null, 'Carnicería'),
-  ('Entraña', 'kg', 8, 3, 15000, 8, null, null, 'Carnicería'),
-  ('Bife de chorizo', 'kg', 10, 4, 12500, 8, null, null, 'Carnicería'),
-  ('Asado de tira', 'kg', 15, 5, 8900, 5, null, null, 'Carnicería'),
-  ('Mollejas', 'kg', 4, 2, 16000, 25, null, null, 'Carnicería'),
-  ('Chorizo', 'u.', 40, 20, 900, 0, 10, 'paquete', 'Carnicería'),
-  ('Morcilla', 'u.', 25, 10, 800, 0, 10, 'paquete', 'Carnicería'),
-  ('Carne cortada para empanadas', 'kg', 3, 1, 9000, 0, null, null, 'Carnicería'),
-  ('Queso provolone', 'kg', 3, 1, 13000, 0, null, null, 'Fiambrería'),
-  ('Pan de chorizo', 'u.', 40, 20, 250, 0, 12, 'docena', 'Panadería'),
-  ('Tapas de empanada', 'u.', 48, 24, 120, 0, 12, 'docena', 'Panadería'),
-  ('Papas', 'kg', 25, 10, 900, 20, 10, 'bolsa', 'Verdulería'),
-  ('Lechuga', 'kg', 2, 1, 2800, 25, null, null, 'Verdulería'),
-  ('Tomate', 'kg', 4, 2, 2200, 10, null, null, 'Verdulería'),
-  ('Cebolla', 'kg', 6, 2, 1200, 10, null, null, 'Verdulería'),
-  ('Limones', 'u.', 40, 15, 150, 0, null, null, 'Verdulería'),
-  ('Menta', 'atados', 4, 2, 900, 0, null, null, 'Verdulería'),
-  ('Aceite', 'L', 10, 4, 3200, 0, 5, 'bidón', 'Mayorista'),
-  ('Azúcar', 'kg', 3, 1, 1300, 0, 1, 'paquete', 'Mayorista'),
-  ('Harina', 'kg', 5, 2, 900, 0, 1, 'paquete', 'Mayorista'),
-  ('Leche', 'L', 6, 3, 1500, 0, 1, 'sachet', 'Mayorista'),
-  ('Huevos', 'u.', 30, 12, 260, 0, 30, 'maple', 'Mayorista'),
-  ('Dulce de leche', 'kg', 3, 1, 6500, 0, 1, 'pote', 'Mayorista'),
-  ('Crema', 'L', 2, 1, 5200, 0, 0.5, 'pote', 'Mayorista'),
-  ('Carbón', 'kg', 40, 15, 900, 0, 10, 'bolsa', 'Mayorista'),
-  ('Hielo', 'kg', 30, 10, 500, 0, 15, 'bolsa', 'Hielo'),
-  ('Fernet', 'ml', 3000, 1500, 20, 0, 750, 'botella', 'Distribuidora'),
-  ('Cola', 'ml', 12000, 4000, 2.2, 0, 2250, 'botella 2,25 L', 'Distribuidora'),
-  ('Gin', 'ml', 2100, 700, 26, 0, 700, 'botella', 'Distribuidora'),
-  ('Tónica', 'ml', 6000, 3000, 4, 0, 1500, 'botella 1,5 L', 'Distribuidora'),
-  ('Aperol', 'ml', 1500, 750, 22, 0, 750, 'botella', 'Distribuidora'),
-  ('Espumante', 'ml', 3000, 1500, 10, 0, 750, 'botella', 'Distribuidora'),
-  ('Ron blanco', 'ml', 1500, 750, 16, 0, 750, 'botella', 'Distribuidora'),
-  ('Vino Malbec (por copa)', 'ml', 4500, 1500, 11, 0, 750, 'botella', 'Distribuidora'),
-  ('Cerveza rubia', 'L', 60, 30, 2400, 5, 50, 'barril', 'Cervecería'),
-  ('Cerveza IPA', 'L', 40, 20, 3100, 5, 50, 'barril', 'Cervecería')
-) as x(nombre, unidad, cantidad, minimo, costo, merma, pack, pack_nombre, prov)
+  -- Quesos y fiambres
+  ('Muzzarella', 'kg', 6, 9500, 0, null, null, 'Fiambrería'),
+  ('Queso roquefort', 'kg', 1, 18000, 0, null, null, 'Fiambrería'),
+  ('Queso parmesano', 'kg', 0.5, 22000, 0, null, null, 'Fiambrería'),
+  ('Queso cheddar en fetas', 'kg', 1, 15000, 0, null, null, 'Fiambrería'),
+  ('Queso cheddar para salsa', 'kg', 1, 9000, 0, null, null, 'Fiambrería'),
+  ('Jamón crudo', 'kg', 1, 30000, 0, null, null, 'Fiambrería'),
+  ('Jamón cocido', 'kg', 1, 12000, 0, null, null, 'Fiambrería'),
+  ('Panceta', 'kg', 1, 16000, 0, null, null, 'Fiambrería'),
+  -- Carnes
+  ('Carne picada', 'kg', 4, 8500, 0, null, null, 'Carnicería'),
+  ('Carne para milanesa', 'kg', 3, 11000, 8, null, null, 'Carnicería'),
+  ('Pechuga de pollo', 'kg', 4, 6500, 10, null, null, 'Carnicería'),
+  ('Carne cortada para empanadas', 'kg', 1, 9000, 0, null, null, 'Carnicería'),
+  -- Panificados
+  ('Pan de hamburguesa', 'u.', 24, 450, 0, 12, 'docena', 'Panadería'),
+  ('Pan de sándwich', 'u.', 12, 600, 0, 12, 'docena', 'Panadería'),
+  ('Tapas de empanada', 'u.', 24, 120, 0, 12, 'docena', 'Panadería'),
+  -- Verdulería
+  ('Papas', 'kg', 15, 900, 20, 10, 'bolsa', 'Verdulería'),
+  ('Cebolla', 'kg', 4, 1200, 10, null, null, 'Verdulería'),
+  ('Tomate', 'kg', 3, 2200, 10, null, null, 'Verdulería'),
+  ('Lechuga', 'kg', 1, 2800, 25, null, null, 'Verdulería'),
+  ('Rúcula', 'kg', 0.5, 6000, 20, null, null, 'Verdulería'),
+  ('Morrón', 'kg', 1, 4000, 15, null, null, 'Verdulería'),
+  ('Ajo', 'kg', 0.2, 6000, 10, null, null, 'Verdulería'),
+  ('Cebolla de verdeo', 'kg', 0.3, 5000, 20, null, null, 'Verdulería'),
+  ('Peras', 'kg', 1, 2500, 15, null, null, 'Verdulería'),
+  ('Manzana verde', 'kg', 1, 3000, 15, null, null, 'Verdulería'),
+  ('Apio', 'kg', 0.5, 3500, 25, null, null, 'Verdulería'),
+  ('Berenjena', 'kg', 1, 3500, 10, null, null, 'Verdulería'),
+  ('Limones', 'u.', 15, 150, 0, null, null, 'Verdulería'),
+  ('Menta', 'atados', 2, 900, 0, null, null, 'Verdulería'),
+  -- Almacén
+  ('Harina', 'kg', 10, 900, 0, 1, 'paquete', 'Mayorista'),
+  ('Levadura', 'kg', 0.2, 8000, 0, 0.5, 'paquete', 'Mayorista'),
+  ('Tomate triturado', 'kg', 4, 2500, 0, 1, 'caja', 'Mayorista'),
+  ('Aceite', 'L', 5, 3200, 0, 5, 'bidón', 'Mayorista'),
+  ('Aceitunas', 'kg', 0.5, 9000, 0, 1, 'frasco', 'Mayorista'),
+  ('Orégano', 'kg', 0.1, 15000, 0, null, null, 'Mayorista'),
+  ('Pimentón', 'kg', 0.1, 14000, 0, null, null, 'Mayorista'),
+  ('Pan rallado', 'kg', 2, 2500, 0, 1, 'paquete', 'Mayorista'),
+  ('Mayonesa', 'kg', 2, 5000, 0, 3, 'balde', 'Mayorista'),
+  ('Salsa barbacoa', 'kg', 1, 7000, 0, 1, 'frasco', 'Mayorista'),
+  ('Nueces', 'kg', 0.3, 18000, 0, null, null, 'Mayorista'),
+  ('Azúcar', 'kg', 1, 1300, 0, 1, 'paquete', 'Mayorista'),
+  ('Leche', 'L', 3, 1500, 0, 1, 'sachet', 'Mayorista'),
+  ('Huevos', 'u.', 30, 260, 0, 30, 'maple', 'Mayorista'),
+  ('Dulce de leche', 'kg', 1, 6500, 0, 1, 'pote', 'Mayorista'),
+  ('Crema', 'L', 1, 5200, 0, 0.5, 'pote', 'Mayorista'),
+  ('Helado', 'kg', 2, 8000, 0, null, null, 'Heladería'),
+  -- Barra
+  ('Hielo', 'kg', 10, 500, 0, 15, 'bolsa', 'Hielo'),
+  ('Fernet', 'ml', 1500, 20, 0, 750, 'botella', 'Distribuidora'),
+  ('Cola', 'ml', 4000, 2.2, 0, 2250, 'botella 2,25 L', 'Distribuidora'),
+  ('Gin', 'ml', 700, 26, 0, 700, 'botella', 'Distribuidora'),
+  ('Tónica', 'ml', 3000, 4, 0, 1500, 'botella 1,5 L', 'Distribuidora'),
+  ('Aperol', 'ml', 750, 22, 0, 750, 'botella', 'Distribuidora'),
+  ('Espumante', 'ml', 1500, 10, 0, 750, 'botella', 'Distribuidora'),
+  ('Ron blanco', 'ml', 750, 16, 0, 750, 'botella', 'Distribuidora'),
+  ('Vino Malbec (por copa)', 'ml', 1500, 11, 0, 750, 'botella', 'Distribuidora'),
+  ('Cerveza rubia', 'L', 30, 2400, 5, 50, 'barril', 'Cervecería'),
+  ('Cerveza IPA', 'L', 20, 3100, 5, 50, 'barril', 'Cervecería')
+) as x(nombre, unidad, minimo, costo, merma, pack, pack_nombre, prov)
 on conflict (nombre) do nothing;
 
-insert into productos (nombre, descripcion, categoria_id, precio, estacion, controla_stock, stock, stock_min, orden)
-select x.nombre, x.descr, c.id, x.precio, c.estacion, x.ctrl, coalesce(x.stock, 0), coalesce(x.smin, 0), x.orden
+-- Platos y bebidas (precio estimado · pausado = todavía no se ofrece)
+insert into productos (nombre, descripcion, categoria_id, precio, estacion, activo, controla_stock, stock, stock_min, orden)
+select x.nombre, x.descr, c.id, x.precio, c.estacion, x.activo, x.ctrl, 0, coalesce(x.smin, 0), x.orden
 from (values
-  ('Provoleta', 'Con orégano y aceite de oliva', 'Entradas', 9500, false, null, null, 1),
-  ('Empanada de carne', 'Cortada a cuchillo', 'Entradas', 2800, false, null, null, 2),
-  ('Choripán', 'Con chimichurri', 'Entradas', 6500, false, null, null, 3),
-  ('Morcilla', null, 'Parrilla', 4500, false, null, null, 1),
-  ('Mollejas', 'Al limón', 'Parrilla', 15000, false, null, null, 2),
-  ('Vacío', '400 g', 'Parrilla', 22000, false, null, null, 3),
-  ('Entraña', '350 g', 'Parrilla', 25000, false, null, null, 4),
-  ('Bife de chorizo', '450 g', 'Parrilla', 26000, false, null, null, 5),
-  ('Asado de tira', null, 'Parrilla', 21000, false, null, null, 6),
-  ('Parrillada para 2', 'Asado, vacío, chorizo, morcilla y mollejas', 'Parrilla', 48000, false, null, null, 7),
-  ('Papas fritas', null, 'Guarniciones', 7000, false, null, null, 1),
-  ('Ensalada mixta', 'Lechuga, tomate y cebolla', 'Guarniciones', 6000, false, null, null, 2),
-  ('Flan mixto', 'Con dulce de leche y crema', 'Postres', 6000, false, null, null, 1),
-  ('Panqueque con dulce de leche', null, 'Postres', 6000, false, null, null, 2),
-  ('Fernet con cola', null, 'Tragos', 7500, false, null, null, 1),
-  ('Gin tonic', null, 'Tragos', 9000, false, null, null, 2),
-  ('Aperol spritz', null, 'Tragos', 9000, false, null, null, 3),
-  ('Mojito', null, 'Tragos', 8500, false, null, null, 4),
-  ('Pinta rubia tirada', null, 'Cervezas', 5500, false, null, null, 1),
-  ('Pinta IPA tirada', null, 'Cervezas', 6500, false, null, null, 2),
-  ('Porrón 1 L', null, 'Cervezas', 7000, true, 48, 12, 3),
-  ('Copa de Malbec', null, 'Vinos', 5000, false, null, null, 1),
-  ('Botella Malbec de la casa', '750 ml', 'Vinos', 18000, true, 24, 6, 2),
-  ('Botella Cabernet', '750 ml', 'Vinos', 20000, true, 12, 4, 3),
-  ('Agua mineral', '500 ml', 'Sin alcohol', 3000, true, 36, 12, 1),
-  ('Gaseosa', '500 ml', 'Sin alcohol', 3500, true, 36, 12, 2)
-) as x(nombre, descr, cat, precio, ctrl, stock, smin, orden)
+  ('Empanada de carne', 'Frita o al horno', 'Entradas', 2800, true, false, null, 1),
+  ('Tiras de pollo crocantes', 'Rebozadas y fritas', 'Entradas', 10500, true, false, null, 2),
+  ('Aros de cebolla', 'Rebozados y crocantes', 'Entradas', 8500, true, false, null, 3),
+
+  ('Pizza muzzarella', 'Salsa de tomate, muzzarella, orégano y aceitunas', 'Pizzas', 15000, true, false, null, 1),
+  ('Fugazzeta', 'Muzzarella y cebolla', 'Pizzas', 16000, true, false, null, 2),
+  ('Napolitana', 'Muzzarella, rodajas de tomate y ajo. Se puede pedir sin ajo', 'Pizzas', 17000, true, false, null, 3),
+  ('Pizza especial', 'Muzzarella, jamón, morrón y aceitunas', 'Pizzas', 18500, true, false, null, 4),
+  ('Pizza rúcula y crudo', 'Muzzarella, jamón crudo, rúcula y parmesano', 'Pizzas', 21000, true, false, null, 5),
+  ('Pizza pera y roquefort', 'Muzzarella, peras y roquefort', 'Pizzas', 20000, true, false, null, 6),
+
+  ('Cheeseburger', 'Medallón de carne con doble cheddar', 'Hamburguesas', 13500, true, false, null, 1),
+  ('Hamburguesa cheddar y panceta', 'Cheddar, panceta, cebolla caramelizada y salsa barbacoa', 'Hamburguesas', 16000, true, false, null, 2),
+  ('Hamburguesa clásica', 'Medallón de carne, queso, lechuga y tomate', 'Hamburguesas', 13000, true, false, null, 3),
+  ('Hamburguesa azul', 'Roquefort, rúcula y cebolla', 'Hamburguesas', 16000, true, false, null, 4),
+
+  ('Sándwich de milanesa de carne', 'Con lechuga, tomate y mayonesa', 'Sándwiches', 15000, true, false, null, 1),
+  ('Sándwich de milanesa de pollo', 'Con lechuga, tomate y mayonesa', 'Sándwiches', 14000, true, false, null, 2),
+  ('Sándwich vegetariano', 'Berenjenas grilladas, rúcula y queso', 'Sándwiches', 12500, false, false, null, 3),
+
+  ('Papas cheddar, panceta y verdeo', null, 'Papas', 11000, true, false, null, 1),
+  ('Papas 4 quesos', 'Muzzarella, roquefort, parmesano y cheddar', 'Papas', 11500, true, false, null, 2),
+  ('Papas bravas', 'Con salsa brava picante y alioli', 'Papas', 9500, true, false, null, 3),
+
+  ('Ensalada César', 'Lechuga, pollo grillado, croutons, parmesano y aderezo César', 'Ensaladas', 12000, true, false, null, 1),
+  ('Ensalada Waldorf', 'Cubos de manzana verde, apio fileteado, nueces tostadas y aderezo cremoso de mayonesa ligera', 'Ensaladas', 11500, true, false, null, 2),
+
+  ('Flan', 'Con dulce de leche o crema', 'Postres', 6000, true, false, null, 1),
+  ('Helado', 'Dos bochas', 'Postres', 5500, true, false, null, 2),
+  ('Especial de la casa', 'Preguntale al mozo cuál hay hoy', 'Postres', 7500, true, false, null, 3),
+
+  ('Fernet con cola', null, 'Tragos', 7500, true, false, null, 1),
+  ('Gin tonic', null, 'Tragos', 9000, true, false, null, 2),
+  ('Aperol spritz', null, 'Tragos', 9000, true, false, null, 3),
+  ('Mojito', null, 'Tragos', 8500, true, false, null, 4),
+  ('Pinta rubia tirada', null, 'Cervezas', 5500, true, false, null, 1),
+  ('Pinta IPA tirada', null, 'Cervezas', 6500, true, false, null, 2),
+  ('Porrón 1 L', null, 'Cervezas', 7000, true, true, 12, 3),
+  ('Copa de Malbec', null, 'Vinos', 5000, true, false, null, 1),
+  ('Botella Malbec de la casa', '750 ml', 'Vinos', 18000, true, true, 6, 2),
+  ('Botella Cabernet', '750 ml', 'Vinos', 20000, true, true, 4, 3),
+  ('Agua mineral', '500 ml', 'Sin alcohol', 3000, true, true, 12, 1),
+  ('Gaseosa', '500 ml', 'Sin alcohol', 3500, true, true, 12, 2)
+) as x(nombre, descr, cat, precio, activo, ctrl, smin, orden)
 join categorias c on c.nombre = x.cat
 where not exists (select 1 from productos p where p.nombre = x.nombre);
 
+-- Recetas: cuánto lleva cada plato, en la unidad del artículo (kg, L, u., ml)
 insert into receta_items (producto_id, insumo_id, cantidad)
 select p.id, i.id, x.cant
 from (values
-  ('Provoleta', 'Queso provolone', 0.15),
   ('Empanada de carne', 'Tapas de empanada', 1), ('Empanada de carne', 'Carne cortada para empanadas', 0.06), ('Empanada de carne', 'Cebolla', 0.02),
-  ('Choripán', 'Chorizo', 1), ('Choripán', 'Pan de chorizo', 1),
-  ('Morcilla', 'Morcilla', 1),
-  ('Mollejas', 'Mollejas', 0.3), ('Mollejas', 'Limones', 0.5),
-  ('Vacío', 'Vacío', 0.4), ('Entraña', 'Entraña', 0.35), ('Bife de chorizo', 'Bife de chorizo', 0.45), ('Asado de tira', 'Asado de tira', 0.5),
-  ('Parrillada para 2', 'Asado de tira', 0.4), ('Parrillada para 2', 'Vacío', 0.3), ('Parrillada para 2', 'Chorizo', 2),
-  ('Parrillada para 2', 'Morcilla', 2), ('Parrillada para 2', 'Mollejas', 0.2),
-  ('Papas fritas', 'Papas', 0.35), ('Papas fritas', 'Aceite', 0.05),
-  ('Ensalada mixta', 'Lechuga', 0.1), ('Ensalada mixta', 'Tomate', 0.15), ('Ensalada mixta', 'Cebolla', 0.05),
-  ('Flan mixto', 'Leche', 0.1), ('Flan mixto', 'Huevos', 1), ('Flan mixto', 'Azúcar', 0.03), ('Flan mixto', 'Dulce de leche', 0.04), ('Flan mixto', 'Crema', 0.03),
-  ('Panqueque con dulce de leche', 'Harina', 0.04), ('Panqueque con dulce de leche', 'Leche', 0.08),
-  ('Panqueque con dulce de leche', 'Huevos', 0.5), ('Panqueque con dulce de leche', 'Dulce de leche', 0.08),
+  ('Empanada de carne', 'Aceite', 0.02),
+  ('Tiras de pollo crocantes', 'Pechuga de pollo', 0.2), ('Tiras de pollo crocantes', 'Pan rallado', 0.05), ('Tiras de pollo crocantes', 'Harina', 0.02),
+  ('Tiras de pollo crocantes', 'Huevos', 0.5), ('Tiras de pollo crocantes', 'Aceite', 0.06),
+  ('Aros de cebolla', 'Cebolla', 0.25), ('Aros de cebolla', 'Harina', 0.06), ('Aros de cebolla', 'Leche', 0.05), ('Aros de cebolla', 'Pan rallado', 0.03),
+  ('Aros de cebolla', 'Aceite', 0.08),
+
+  -- Pizzas: la masa (harina, levadura, aceite) más lo de arriba
+  ('Pizza muzzarella', 'Harina', 0.3), ('Pizza muzzarella', 'Levadura', 0.006), ('Pizza muzzarella', 'Aceite', 0.02), ('Pizza muzzarella', 'Tomate triturado', 0.15),
+  ('Pizza muzzarella', 'Muzzarella', 0.4), ('Pizza muzzarella', 'Aceitunas', 0.03), ('Pizza muzzarella', 'Orégano', 0.002),
+  ('Fugazzeta', 'Harina', 0.3), ('Fugazzeta', 'Levadura', 0.006), ('Fugazzeta', 'Aceite', 0.03), ('Fugazzeta', 'Muzzarella', 0.4),
+  ('Fugazzeta', 'Cebolla', 0.3), ('Fugazzeta', 'Orégano', 0.002),
+  ('Napolitana', 'Harina', 0.3), ('Napolitana', 'Levadura', 0.006), ('Napolitana', 'Aceite', 0.02), ('Napolitana', 'Tomate triturado', 0.15),
+  ('Napolitana', 'Muzzarella', 0.35), ('Napolitana', 'Tomate', 0.25), ('Napolitana', 'Ajo', 0.01), ('Napolitana', 'Orégano', 0.002),
+  ('Pizza especial', 'Harina', 0.3), ('Pizza especial', 'Levadura', 0.006), ('Pizza especial', 'Aceite', 0.02), ('Pizza especial', 'Tomate triturado', 0.15),
+  ('Pizza especial', 'Muzzarella', 0.35), ('Pizza especial', 'Jamón cocido', 0.12), ('Pizza especial', 'Morrón', 0.12), ('Pizza especial', 'Aceitunas', 0.03),
+  ('Pizza rúcula y crudo', 'Harina', 0.3), ('Pizza rúcula y crudo', 'Levadura', 0.006), ('Pizza rúcula y crudo', 'Aceite', 0.02),
+  ('Pizza rúcula y crudo', 'Tomate triturado', 0.15), ('Pizza rúcula y crudo', 'Muzzarella', 0.35), ('Pizza rúcula y crudo', 'Jamón crudo', 0.1),
+  ('Pizza rúcula y crudo', 'Rúcula', 0.06), ('Pizza rúcula y crudo', 'Queso parmesano', 0.02),
+  ('Pizza pera y roquefort', 'Harina', 0.3), ('Pizza pera y roquefort', 'Levadura', 0.006), ('Pizza pera y roquefort', 'Aceite', 0.02),
+  ('Pizza pera y roquefort', 'Muzzarella', 0.3), ('Pizza pera y roquefort', 'Peras', 0.25), ('Pizza pera y roquefort', 'Queso roquefort', 0.1),
+
+  -- Hamburguesas: medallón de 180 g
+  ('Cheeseburger', 'Pan de hamburguesa', 1), ('Cheeseburger', 'Carne picada', 0.18), ('Cheeseburger', 'Queso cheddar en fetas', 0.04),
+  ('Hamburguesa cheddar y panceta', 'Pan de hamburguesa', 1), ('Hamburguesa cheddar y panceta', 'Carne picada', 0.18),
+  ('Hamburguesa cheddar y panceta', 'Queso cheddar en fetas', 0.04), ('Hamburguesa cheddar y panceta', 'Panceta', 0.04),
+  ('Hamburguesa cheddar y panceta', 'Cebolla', 0.08), ('Hamburguesa cheddar y panceta', 'Azúcar', 0.01), ('Hamburguesa cheddar y panceta', 'Salsa barbacoa', 0.03),
+  ('Hamburguesa clásica', 'Pan de hamburguesa', 1), ('Hamburguesa clásica', 'Carne picada', 0.18), ('Hamburguesa clásica', 'Queso cheddar en fetas', 0.02),
+  ('Hamburguesa clásica', 'Lechuga', 0.03), ('Hamburguesa clásica', 'Tomate', 0.05), ('Hamburguesa clásica', 'Mayonesa', 0.02),
+  ('Hamburguesa azul', 'Pan de hamburguesa', 1), ('Hamburguesa azul', 'Carne picada', 0.18), ('Hamburguesa azul', 'Queso roquefort', 0.04),
+  ('Hamburguesa azul', 'Rúcula', 0.03), ('Hamburguesa azul', 'Cebolla', 0.05),
+
+  ('Sándwich de milanesa de carne', 'Pan de sándwich', 1), ('Sándwich de milanesa de carne', 'Carne para milanesa', 0.18),
+  ('Sándwich de milanesa de carne', 'Pan rallado', 0.04), ('Sándwich de milanesa de carne', 'Huevos', 0.5), ('Sándwich de milanesa de carne', 'Aceite', 0.05),
+  ('Sándwich de milanesa de carne', 'Lechuga', 0.03), ('Sándwich de milanesa de carne', 'Tomate', 0.05), ('Sándwich de milanesa de carne', 'Mayonesa', 0.02),
+  ('Sándwich de milanesa de pollo', 'Pan de sándwich', 1), ('Sándwich de milanesa de pollo', 'Pechuga de pollo', 0.18),
+  ('Sándwich de milanesa de pollo', 'Pan rallado', 0.04), ('Sándwich de milanesa de pollo', 'Huevos', 0.5), ('Sándwich de milanesa de pollo', 'Aceite', 0.05),
+  ('Sándwich de milanesa de pollo', 'Lechuga', 0.03), ('Sándwich de milanesa de pollo', 'Tomate', 0.05), ('Sándwich de milanesa de pollo', 'Mayonesa', 0.02),
+  ('Sándwich vegetariano', 'Pan de sándwich', 1), ('Sándwich vegetariano', 'Berenjena', 0.15), ('Sándwich vegetariano', 'Rúcula', 0.03),
+  ('Sándwich vegetariano', 'Muzzarella', 0.06), ('Sándwich vegetariano', 'Aceite', 0.02),
+
+  ('Papas cheddar, panceta y verdeo', 'Papas', 0.4), ('Papas cheddar, panceta y verdeo', 'Aceite', 0.06),
+  ('Papas cheddar, panceta y verdeo', 'Queso cheddar para salsa', 0.08), ('Papas cheddar, panceta y verdeo', 'Panceta', 0.05),
+  ('Papas cheddar, panceta y verdeo', 'Cebolla de verdeo', 0.02),
+  ('Papas 4 quesos', 'Papas', 0.4), ('Papas 4 quesos', 'Aceite', 0.06), ('Papas 4 quesos', 'Muzzarella', 0.05), ('Papas 4 quesos', 'Queso roquefort', 0.03),
+  ('Papas 4 quesos', 'Queso parmesano', 0.02), ('Papas 4 quesos', 'Queso cheddar para salsa', 0.05), ('Papas 4 quesos', 'Crema', 0.05),
+  ('Papas bravas', 'Papas', 0.4), ('Papas bravas', 'Aceite', 0.06), ('Papas bravas', 'Tomate triturado', 0.06), ('Papas bravas', 'Pimentón', 0.003),
+  ('Papas bravas', 'Ajo', 0.005), ('Papas bravas', 'Mayonesa', 0.03),
+
+  ('Ensalada César', 'Lechuga', 0.15), ('Ensalada César', 'Pechuga de pollo', 0.12), ('Ensalada César', 'Pan de sándwich', 0.5),
+  ('Ensalada César', 'Queso parmesano', 0.02), ('Ensalada César', 'Mayonesa', 0.03), ('Ensalada César', 'Limones', 0.25), ('Ensalada César', 'Ajo', 0.003),
+  ('Ensalada Waldorf', 'Manzana verde', 0.2), ('Ensalada Waldorf', 'Apio', 0.1), ('Ensalada Waldorf', 'Nueces', 0.03), ('Ensalada Waldorf', 'Mayonesa', 0.04),
+
+  ('Flan', 'Leche', 0.1), ('Flan', 'Huevos', 1), ('Flan', 'Azúcar', 0.03), ('Flan', 'Dulce de leche', 0.04), ('Flan', 'Crema', 0.03),
+  ('Helado', 'Helado', 0.2),
+
   ('Fernet con cola', 'Fernet', 70), ('Fernet con cola', 'Cola', 230), ('Fernet con cola', 'Hielo', 0.2),
   ('Gin tonic', 'Gin', 60), ('Gin tonic', 'Tónica', 200), ('Gin tonic', 'Limones', 0.25), ('Gin tonic', 'Hielo', 0.2),
   ('Aperol spritz', 'Aperol', 90), ('Aperol spritz', 'Espumante', 90), ('Aperol spritz', 'Hielo', 0.2),
@@ -149,11 +249,15 @@ from (values
 join productos p on p.nombre = x.prod join insumos i on i.nombre = x.ins
 on conflict do nothing;
 
--- Los artículos de ejemplo toman el rinde de cocción de la tabla de referencia (cuando el nombre coincide)
+-- Parrilla y Guarniciones (de la carta de ejemplo) se esconden si no les queda nada a la venta
+update categorias c set activa = false
+where c.nombre in ('Parrilla', 'Guarniciones') and not exists (select 1 from productos p where p.categoria_id = c.id and p.activo);
+
+-- Los artículos toman el rinde de cocción de la tabla de referencia (cuando el nombre coincide)
 update insumos i set referencia_id = r.id, rinde_coccion = r.rinde_coccion
 from referencias r where lower(r.nombre) = lower(i.nombre) and i.referencia_id is null;
 
--- Lo que agregó la carta de ejemplo
+-- Lo que agregó la carta
 insert into datos_prueba select 'productos', id::text from productos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'productos');
 insert into datos_prueba select 'insumos', id::text from insumos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'insumos');
 insert into datos_prueba select 'proveedores', id::text from proveedores where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'proveedores');
@@ -205,11 +309,13 @@ begin
   -- Qué se pide más (el resto de la carta sale con peso 1)
   create temp table pesos on commit drop as
   select p.id producto_id, p.nombre, p.precio, p.estacion,
-         case when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
+         case when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' or c.nombre ilike 'papas%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
          coalesce(w.peso, 1)::numeric peso
   from productos p join categorias c on c.id = p.categoria_id
-  left join (values ('Vacío', 3.0), ('Parrillada para 2', 2.0), ('Choripán', 2.5), ('Empanada de carne', 2.0), ('Entraña', 1.6), ('Asado de tira', 1.8),
-                    ('Bife de chorizo', 1.4), ('Provoleta', 1.5), ('Papas fritas', 3.0), ('Fernet con cola', 4.0), ('Pinta rubia tirada', 4.0),
+  left join (values ('Pizza muzzarella', 2.6), ('Fugazzeta', 1.6), ('Napolitana', 1.8), ('Pizza especial', 1.4), ('Pizza rúcula y crudo', 1.3),
+                    ('Hamburguesa cheddar y panceta', 2.6), ('Cheeseburger', 2.0), ('Hamburguesa clásica', 1.5), ('Sándwich de milanesa de carne', 1.8),
+                    ('Sándwich de milanesa de pollo', 1.2), ('Empanada de carne', 2.2), ('Tiras de pollo crocantes', 1.5), ('Aros de cebolla', 1.3),
+                    ('Papas cheddar, panceta y verdeo', 2.5), ('Papas bravas', 1.5), ('Fernet con cola', 4.0), ('Pinta rubia tirada', 4.0),
                     ('Pinta IPA tirada', 2.5), ('Gin tonic', 2.0), ('Gaseosa', 2.2), ('Agua mineral', 1.5), ('Copa de Malbec', 1.5),
                     ('Botella Malbec de la casa', 1.0), ('Aperol spritz', 1.2), ('Porrón 1 L', 1.5)) w(nombre, peso) on w.nombre = p.nombre
   where p.activo and p.precio > 0;
@@ -265,7 +371,7 @@ begin
       -- hielo o algo chico pagado con la caja
       if random() < 0.45 and v_caja is not null then
         insert into gastos (fecha, concepto, categoria, monto, estado, cuenta_id, pagado_el, origen, jornada, usuario_id)
-        values (d, (array['Hielo', 'Hielo', 'Servilletas', 'Carbón extra', 'Limones'])[1 + floor(random() * 5)::int], 'Caja chica', round((3000 + random() * 9000) / 500) * 500,
+        values (d, (array['Hielo', 'Hielo', 'Servilletas', 'Gas envasado', 'Limones'])[1 + floor(random() * 5)::int], 'Caja chica', round((3000 + random() * 9000) / 500) * 500,
                 'pagado', v_caja, d, 'caja', d, coalesce(v_enc, v_admin)) returning id into v_c;
         insert into datos_prueba values ('gastos', v_c::text);
       end if;
@@ -327,10 +433,10 @@ begin
 
   -- ------------------------------------------------------------- mermas
   for r in select * from (values ('Lechuga', 0.6, 'Vencido o en mal estado', null), ('Tomate', 0.8, 'Vencido o en mal estado', null),
-      ('Mollejas', 0.4, 'Se quemó o salió mal', 'Se pasaron en la parrilla'), ('Vacío', 0.45, 'Devolución del cliente', 'Lo pidieron jugoso'),
-      ('Pan de chorizo', 6, 'Sobrante del día', null), ('Cerveza rubia', 3, 'Rotura o derrame', 'Cambio de barril'), ('Hielo', 5, 'Otro', 'Se derritió en la heladera'),
+      ('Carne picada', 0.36, 'Se quemó o salió mal', 'Dos medallones pasados'), ('Muzzarella', 0.4, 'Devolución del cliente', 'Pizza mal cortada, se hizo otra'),
+      ('Pan de hamburguesa', 6, 'Sobrante del día', null), ('Cerveza rubia', 3, 'Rotura o derrame', 'Cambio de barril'), ('Hielo', 5, 'Otro', 'Se derritió en la heladera'),
       ('Papas', 1.5, 'Vencido o en mal estado', 'Brotadas'), ('Fernet', 350, 'Rotura o derrame', 'Se cayó una botella abierta'), ('Crema', 0.5, 'Vencido o en mal estado', null),
-      ('Entraña', 0.35, 'Se quemó o salió mal', null), ('Lechuga', 0.4, 'Sobrante del día', null)) v(ins, cant, motivo, nota) loop
+      ('Rúcula', 0.2, 'Vencido o en mal estado', 'Se marchitó'), ('Lechuga', 0.4, 'Sobrante del día', null)) v(ins, cant, motivo, nota) loop
     select id, costo into v_p, v_tot from insumos where nombre = r.ins;
     continue when v_p is null;
     d := v_ini + 2 + floor(random() * (v_hoy - v_ini - 3))::int;
@@ -355,7 +461,7 @@ begin
          0::numeric a, 0::numeric falta, 0::numeric b
   from insumos i left join movimientos_stock m on m.insumo_id = i.id where i.activo group by i.id, i.costo, i.minimo, i.nombre;
   -- lo que falta sin explicar: un poco de carne y de bebida (lo típico)
-  update conteo set falta = round(venta_ab * case when nombre in ('Vacío', 'Entraña', 'Bife de chorizo') then 0.04 + random()::numeric * 0.03
+  update conteo set falta = round(venta_ab * case when nombre in ('Muzzarella', 'Jamón crudo', 'Carne picada') then 0.04 + random()::numeric * 0.03
                                                   when nombre in ('Fernet', 'Gin') then 0.05 + random()::numeric * 0.04
                                                   when random()::numeric < 0.3 then random()::numeric * 0.02 else 0 end, 3);
   update conteo set a = round(minimo + sale_ab * 0.7 + random()::numeric * greatest(minimo, 1), case when nombre ilike '%chorizo%' or minimo >= 10 then 0 else 2 end);
@@ -374,18 +480,18 @@ begin
   -- Lo que hay hoy sale del último conteo más lo que entró y salió después
   update insumos i set cantidad = greatest(0, round(c.b + c.entro_desp - c.sale_desp, 3)) from conteo c where c.insumo_id = i.id;
   -- Algunos quedan justos, para que la lista de compras y Chichito tengan qué decir
-  update insumos set cantidad = round(minimo * 0.6, 2) where nombre in ('Entraña', 'Limones', 'Tónica', 'Queso provolone');
+  update insumos set cantidad = round(minimo * 0.6, 2) where nombre in ('Jamón crudo', 'Limones', 'Tónica', 'Rúcula');
   update insumos set cantidad = 0 where nombre = 'Menta';
-  update insumos set vence = v_hoy + 1 where nombre = 'Mollejas';
+  update insumos set vence = v_hoy + 1 where nombre = 'Carne picada';
   update insumos set vence = v_hoy where nombre = 'Lechuga';
   update insumos set vence = v_hoy + 4 where nombre in ('Crema', 'Leche');
   update productos set stock = round(stock_min * (0.5 + random() * 2.5)) where controla_stock;
   update productos set stock = round(stock_min * 0.6) where nombre in ('Agua mineral', 'Botella Malbec de la casa');
 
   -- ------------------------------------------------------------- pruebas de rendimiento
-  for r in select * from (values ('Vacío', 6.2, 5.42, 3.85, 'Carnicería', 'Pieza entera, con grasa'), ('Vacío', 5.8, 5.12, null, 'Carnicería', null),
-      ('Mollejas', 2.0, 1.46, 1.02, 'Carnicería', 'Limpias y blanqueadas'), ('Papas', 10, 7.95, 4.45, 'Verdulería', 'Bastón, fritas dos veces'),
-      ('Entraña', 3.1, 2.86, 2.0, 'Carnicería', null)) v(ins, crudo, limpio, cocido, prov, nota) loop
+  for r in select * from (values ('Carne para milanesa', 5.0, 4.55, 3.6, 'Carnicería', 'Nalga, desgrasada y en fetas'), ('Carne para milanesa', 4.6, 4.25, null, 'Carnicería', null),
+      ('Pechuga de pollo', 4.0, 3.55, 2.65, 'Carnicería', 'Sin piel, en tiras'), ('Papas', 10, 7.95, 4.45, 'Verdulería', 'Bastón, fritas dos veces'),
+      ('Carne picada', 5.0, 5.0, 3.85, 'Carnicería', 'Medallones de 180 g')) v(ins, crudo, limpio, cocido, prov, nota) loop
     select id into v_p from insumos where nombre = r.ins;
     continue when v_p is null;
     insert into rendimientos (insumo_id, proveedor, crudo, limpio, cocido, nota, fecha, usuario_id)
@@ -401,7 +507,7 @@ begin
         ('Luz', 'Luz, gas y agua', 520000, 18, 'banco'), ('Gas', 'Luz, gas y agua', 260000, 15, 'banco'), ('Agua', 'Luz, gas y agua', 48000, 20, 'banco'),
         ('Internet', 'Internet y teléfono', 42000, 10, 'banco'), ('Monotributo', 'Impuestos y tasas', 210000, 20, 'banco'), ('Tasa municipal', 'Impuestos y tasas', 95000, 25, 'banco'),
         ('Publicidad en Instagram', 'Publicidad', 120000, 8, 'billetera'), ('Artículos de limpieza', 'Limpieza', 135000, 6, 'caja'),
-        ('Service de la parrilla', 'Mantenimiento', 220000, 22, 'caja'), ('Comisiones de tarjetas', 'Comisiones y bancos', 380000, 28, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
+        ('Service del horno', 'Mantenimiento', 220000, 22, 'caja'), ('Comisiones de tarjetas', 'Comisiones y bancos', 380000, 28, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
       v_f := v_mes + (r.dia - 1);
       continue when v_f < v_ini or (v_f > v_hoy and r.concepto not in ('Luz', 'Internet', 'Gas'));
       insert into gastos (fecha, concepto, categoria, monto, estado, cuenta_id, pagado_el, vence, origen, usuario_id)
@@ -431,7 +537,7 @@ begin
       (0, '22:00', 'Gómez', 2, 'pendiente', 'web', 'Es un cumpleaños'), (0, '22:30', 'Romero', 5, 'pendiente', 'web', null),
       (1, '21:00', 'Sosa', 8, 'confirmada', 'telefono', 'Vienen con dos chicos'), (1, '21:30', 'Díaz', 3, 'pendiente', 'web', null),
       (1, '22:00', 'Benítez', 4, 'confirmada', 'web', null), (1, '23:00', 'Acosta', 2, 'pendiente', 'web', null),
-      (2, '21:00', 'Álvarez', 10, 'confirmada', 'telefono', 'Despedida, quieren parrillada'), (2, '21:30', 'Pereyra', 4, 'pendiente', 'web', null),
+      (2, '21:00', 'Álvarez', 10, 'confirmada', 'telefono', 'Despedida, quieren pizzas para compartir'), (2, '21:30', 'Pereyra', 4, 'pendiente', 'web', null),
       (2, '22:00', 'Torres', 6, 'confirmada', 'web', 'Uno es celíaco'), (2, '22:30', 'Ruiz', 2, 'pendiente', 'web', null), (2, '22:30', 'Medina', 4, 'pendiente', 'web', null),
       (4, '21:30', 'Herrera', 3, 'pendiente', 'web', null),
       (-1, '21:30', 'Castro', 4, 'sentada', 'web', null), (-1, '22:00', 'Vega', 2, 'no_vino', 'web', null),
@@ -478,8 +584,8 @@ begin
   end if;
   -- Correcciones de la noche (para la lista de la Caja)
   insert into pedido_cambios (hora, jornada, mesa, tipo, nombre, cantidad, importe, motivo, usuario_id, usuario) values
-    (now() - interval '40 minutes', v_hoy, 'Mesa 10', 'sacado', 'Papas fritas', 1, (select precio from productos where nombre = 'Papas fritas'), 'Se equivocó al pedir', v_mozos[1], (select nombre from perfiles where id = v_mozos[1])),
-    (now() - interval '30 minutes', v_hoy, 'Mesa 11', 'invitado', 'Flan mixto', 1, (select precio from productos where nombre = 'Flan mixto'), 'Demoró la cocina', coalesce(v_enc, v_admin), (select nombre from perfiles where id = coalesce(v_enc, v_admin)));
+    (now() - interval '40 minutes', v_hoy, 'Mesa 10', 'sacado', 'Papas bravas', 1, (select precio from productos where nombre = 'Papas bravas'), 'Se equivocó al pedir', v_mozos[1], (select nombre from perfiles where id = v_mozos[1])),
+    (now() - interval '30 minutes', v_hoy, 'Mesa 11', 'invitado', 'Flan', 1, (select precio from productos where nombre = 'Flan'), 'Demoró la cocina', coalesce(v_enc, v_admin), (select nombre from perfiles where id = coalesce(v_enc, v_admin)));
   for v_c in select id from pedido_cambios where jornada = v_hoy and hora > now() - interval '1 hour' loop insert into datos_prueba values ('pedido_cambios', v_c::text) on conflict do nothing; end loop;
 
   -- Pedidos sin mesa en curso: uno para llevar y un delivery
@@ -525,7 +631,9 @@ begin
     insert into datos_prueba values ('pedidos', v_c::text);
     insert into pedido_items (pedido_id, producto_id, nombre, cantidad, precio, estacion, nota)
     select v_c, p.producto_id, p.nombre, sum(i.cantidad), p.precio, p.estacion,
-           case when p.nombre in ('Vacío', 'Bife de chorizo', 'Entraña') and random() < 0.5 then (array['A punto', 'Jugoso', 'Bien cocido'])[1 + floor(random() * 3)::int] end
+           case when p.nombre = 'Napolitana' and random() < 0.6 then 'Sin ajo'
+                when p.nombre = 'Empanada de carne' then (array['Fritas', 'Al horno'])[1 + floor(random() * 2)::int]
+                when p.nombre like 'Hamburguesa%' and random() < 0.3 then 'Sin cebolla' end
     from items_t i join pesos p using (producto_id) group by p.producto_id, p.nombre, p.precio, p.estacion;
     if r.qr then
       insert into llamados (mesa_id, creado) values (v_p, now() - interval '2 minutes') on conflict do nothing;

@@ -14,6 +14,6 @@ $P -d postgres -c "do \$\$ begin
   end if; end \$\$" >/dev/null 2>&1 || true
 $P -d $BASE -f pruebas/local/supabase-simulado.sql
 for f in supabase/migrations/*.sql; do $P -d $BASE -f "$f"; done
-$P -d $BASE -f puesta-en-marcha/3-carta-de-ejemplo.sql
+[ -n "${SIN_CARTA:-}" ] || $P -d $BASE -f pruebas/local/carta-pruebas.sql
 $P -d $BASE -f pruebas/local/usuarios-de-prueba.sql
 echo "Base $BASE lista."

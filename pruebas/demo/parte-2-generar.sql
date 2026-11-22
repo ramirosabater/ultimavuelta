@@ -1,5 +1,5 @@
 
--- Lo que agregó la carta de ejemplo
+-- Lo que agregó la carta
 insert into datos_prueba select 'productos', id::text from productos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'productos');
 insert into datos_prueba select 'insumos', id::text from insumos where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'insumos');
 insert into datos_prueba select 'proveedores', id::text from proveedores where id > (select (datos->>'id')::bigint from datos_prueba_antes where tabla = 'max' and id = 'proveedores');
@@ -51,11 +51,13 @@ begin
   -- Qué se pide más (el resto de la carta sale con peso 1)
   create temp table pesos on commit drop as
   select p.id producto_id, p.nombre, p.precio, p.estacion,
-         case when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
+         case when p.estacion = 'barra' then 'bebida' when c.nombre ilike 'guarni%' or c.nombre ilike 'papas%' then 'guarni' when c.nombre ilike 'postre%' then 'postre' else 'plato' end grupo,
          coalesce(w.peso, 1)::numeric peso
   from productos p join categorias c on c.id = p.categoria_id
-  left join (values ('Vacío', 3.0), ('Parrillada para 2', 2.0), ('Choripán', 2.5), ('Empanada de carne', 2.0), ('Entraña', 1.6), ('Asado de tira', 1.8),
-                    ('Bife de chorizo', 1.4), ('Provoleta', 1.5), ('Papas fritas', 3.0), ('Fernet con cola', 4.0), ('Pinta rubia tirada', 4.0),
+  left join (values ('Pizza muzzarella', 2.6), ('Fugazzeta', 1.6), ('Napolitana', 1.8), ('Pizza especial', 1.4), ('Pizza rúcula y crudo', 1.3),
+                    ('Hamburguesa cheddar y panceta', 2.6), ('Cheeseburger', 2.0), ('Hamburguesa clásica', 1.5), ('Sándwich de milanesa de carne', 1.8),
+                    ('Sándwich de milanesa de pollo', 1.2), ('Empanada de carne', 2.2), ('Tiras de pollo crocantes', 1.5), ('Aros de cebolla', 1.3),
+                    ('Papas cheddar, panceta y verdeo', 2.5), ('Papas bravas', 1.5), ('Fernet con cola', 4.0), ('Pinta rubia tirada', 4.0),
                     ('Pinta IPA tirada', 2.5), ('Gin tonic', 2.0), ('Gaseosa', 2.2), ('Agua mineral', 1.5), ('Copa de Malbec', 1.5),
                     ('Botella Malbec de la casa', 1.0), ('Aperol spritz', 1.2), ('Porrón 1 L', 1.5)) w(nombre, peso) on w.nombre = p.nombre
   where p.activo and p.precio > 0;
@@ -111,7 +113,7 @@ begin
       -- hielo o algo chico pagado con la caja
       if random() < 0.45 and v_caja is not null then
         insert into gastos (fecha, concepto, categoria, monto, estado, cuenta_id, pagado_el, origen, jornada, usuario_id)
-        values (d, (array['Hielo', 'Hielo', 'Servilletas', 'Carbón extra', 'Limones'])[1 + floor(random() * 5)::int], 'Caja chica', round((3000 + random() * 9000) / 500) * 500,
+        values (d, (array['Hielo', 'Hielo', 'Servilletas', 'Gas envasado', 'Limones'])[1 + floor(random() * 5)::int], 'Caja chica', round((3000 + random() * 9000) / 500) * 500,
                 'pagado', v_caja, d, 'caja', d, coalesce(v_enc, v_admin)) returning id into v_c;
         insert into datos_prueba values ('gastos', v_c::text);
       end if;
@@ -173,10 +175,10 @@ begin
 
   -- ------------------------------------------------------------- mermas
   for r in select * from (values ('Lechuga', 0.6, 'Vencido o en mal estado', null), ('Tomate', 0.8, 'Vencido o en mal estado', null),
-      ('Mollejas', 0.4, 'Se quemó o salió mal', 'Se pasaron en la parrilla'), ('Vacío', 0.45, 'Devolución del cliente', 'Lo pidieron jugoso'),
-      ('Pan de chorizo', 6, 'Sobrante del día', null), ('Cerveza rubia', 3, 'Rotura o derrame', 'Cambio de barril'), ('Hielo', 5, 'Otro', 'Se derritió en la heladera'),
+      ('Carne picada', 0.36, 'Se quemó o salió mal', 'Dos medallones pasados'), ('Muzzarella', 0.4, 'Devolución del cliente', 'Pizza mal cortada, se hizo otra'),
+      ('Pan de hamburguesa', 6, 'Sobrante del día', null), ('Cerveza rubia', 3, 'Rotura o derrame', 'Cambio de barril'), ('Hielo', 5, 'Otro', 'Se derritió en la heladera'),
       ('Papas', 1.5, 'Vencido o en mal estado', 'Brotadas'), ('Fernet', 350, 'Rotura o derrame', 'Se cayó una botella abierta'), ('Crema', 0.5, 'Vencido o en mal estado', null),
-      ('Entraña', 0.35, 'Se quemó o salió mal', null), ('Lechuga', 0.4, 'Sobrante del día', null)) v(ins, cant, motivo, nota) loop
+      ('Rúcula', 0.2, 'Vencido o en mal estado', 'Se marchitó'), ('Lechuga', 0.4, 'Sobrante del día', null)) v(ins, cant, motivo, nota) loop
     select id, costo into v_p, v_tot from insumos where nombre = r.ins;
     continue when v_p is null;
     d := v_ini + 2 + floor(random() * (v_hoy - v_ini - 3))::int;
@@ -201,7 +203,7 @@ begin
          0::numeric a, 0::numeric falta, 0::numeric b
   from insumos i left join movimientos_stock m on m.insumo_id = i.id where i.activo group by i.id, i.costo, i.minimo, i.nombre;
   -- lo que falta sin explicar: un poco de carne y de bebida (lo típico)
-  update conteo set falta = round(venta_ab * case when nombre in ('Vacío', 'Entraña', 'Bife de chorizo') then 0.04 + random()::numeric * 0.03
+  update conteo set falta = round(venta_ab * case when nombre in ('Muzzarella', 'Jamón crudo', 'Carne picada') then 0.04 + random()::numeric * 0.03
                                                   when nombre in ('Fernet', 'Gin') then 0.05 + random()::numeric * 0.04
                                                   when random()::numeric < 0.3 then random()::numeric * 0.02 else 0 end, 3);
   update conteo set a = round(minimo + sale_ab * 0.7 + random()::numeric * greatest(minimo, 1), case when nombre ilike '%chorizo%' or minimo >= 10 then 0 else 2 end);
@@ -220,18 +222,18 @@ begin
   -- Lo que hay hoy sale del último conteo más lo que entró y salió después
   update insumos i set cantidad = greatest(0, round(c.b + c.entro_desp - c.sale_desp, 3)) from conteo c where c.insumo_id = i.id;
   -- Algunos quedan justos, para que la lista de compras y Chichito tengan qué decir
-  update insumos set cantidad = round(minimo * 0.6, 2) where nombre in ('Entraña', 'Limones', 'Tónica', 'Queso provolone');
+  update insumos set cantidad = round(minimo * 0.6, 2) where nombre in ('Jamón crudo', 'Limones', 'Tónica', 'Rúcula');
   update insumos set cantidad = 0 where nombre = 'Menta';
-  update insumos set vence = v_hoy + 1 where nombre = 'Mollejas';
+  update insumos set vence = v_hoy + 1 where nombre = 'Carne picada';
   update insumos set vence = v_hoy where nombre = 'Lechuga';
   update insumos set vence = v_hoy + 4 where nombre in ('Crema', 'Leche');
   update productos set stock = round(stock_min * (0.5 + random() * 2.5)) where controla_stock;
   update productos set stock = round(stock_min * 0.6) where nombre in ('Agua mineral', 'Botella Malbec de la casa');
 
   -- ------------------------------------------------------------- pruebas de rendimiento
-  for r in select * from (values ('Vacío', 6.2, 5.42, 3.85, 'Carnicería', 'Pieza entera, con grasa'), ('Vacío', 5.8, 5.12, null, 'Carnicería', null),
-      ('Mollejas', 2.0, 1.46, 1.02, 'Carnicería', 'Limpias y blanqueadas'), ('Papas', 10, 7.95, 4.45, 'Verdulería', 'Bastón, fritas dos veces'),
-      ('Entraña', 3.1, 2.86, 2.0, 'Carnicería', null)) v(ins, crudo, limpio, cocido, prov, nota) loop
+  for r in select * from (values ('Carne para milanesa', 5.0, 4.55, 3.6, 'Carnicería', 'Nalga, desgrasada y en fetas'), ('Carne para milanesa', 4.6, 4.25, null, 'Carnicería', null),
+      ('Pechuga de pollo', 4.0, 3.55, 2.65, 'Carnicería', 'Sin piel, en tiras'), ('Papas', 10, 7.95, 4.45, 'Verdulería', 'Bastón, fritas dos veces'),
+      ('Carne picada', 5.0, 5.0, 3.85, 'Carnicería', 'Medallones de 180 g')) v(ins, crudo, limpio, cocido, prov, nota) loop
     select id into v_p from insumos where nombre = r.ins;
     continue when v_p is null;
     insert into rendimientos (insumo_id, proveedor, crudo, limpio, cocido, nota, fecha, usuario_id)
@@ -247,7 +249,7 @@ begin
         ('Luz', 'Luz, gas y agua', 520000, 18, 'banco'), ('Gas', 'Luz, gas y agua', 260000, 15, 'banco'), ('Agua', 'Luz, gas y agua', 48000, 20, 'banco'),
         ('Internet', 'Internet y teléfono', 42000, 10, 'banco'), ('Monotributo', 'Impuestos y tasas', 210000, 20, 'banco'), ('Tasa municipal', 'Impuestos y tasas', 95000, 25, 'banco'),
         ('Publicidad en Instagram', 'Publicidad', 120000, 8, 'billetera'), ('Artículos de limpieza', 'Limpieza', 135000, 6, 'caja'),
-        ('Service de la parrilla', 'Mantenimiento', 220000, 22, 'caja'), ('Comisiones de tarjetas', 'Comisiones y bancos', 380000, 28, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
+        ('Service del horno', 'Mantenimiento', 220000, 22, 'caja'), ('Comisiones de tarjetas', 'Comisiones y bancos', 380000, 28, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
       v_f := v_mes + (r.dia - 1);
       continue when v_f < v_ini or (v_f > v_hoy and r.concepto not in ('Luz', 'Internet', 'Gas'));
       insert into gastos (fecha, concepto, categoria, monto, estado, cuenta_id, pagado_el, vence, origen, usuario_id)
@@ -277,7 +279,7 @@ begin
       (0, '22:00', 'Gómez', 2, 'pendiente', 'web', 'Es un cumpleaños'), (0, '22:30', 'Romero', 5, 'pendiente', 'web', null),
       (1, '21:00', 'Sosa', 8, 'confirmada', 'telefono', 'Vienen con dos chicos'), (1, '21:30', 'Díaz', 3, 'pendiente', 'web', null),
       (1, '22:00', 'Benítez', 4, 'confirmada', 'web', null), (1, '23:00', 'Acosta', 2, 'pendiente', 'web', null),
-      (2, '21:00', 'Álvarez', 10, 'confirmada', 'telefono', 'Despedida, quieren parrillada'), (2, '21:30', 'Pereyra', 4, 'pendiente', 'web', null),
+      (2, '21:00', 'Álvarez', 10, 'confirmada', 'telefono', 'Despedida, quieren pizzas para compartir'), (2, '21:30', 'Pereyra', 4, 'pendiente', 'web', null),
       (2, '22:00', 'Torres', 6, 'confirmada', 'web', 'Uno es celíaco'), (2, '22:30', 'Ruiz', 2, 'pendiente', 'web', null), (2, '22:30', 'Medina', 4, 'pendiente', 'web', null),
       (4, '21:30', 'Herrera', 3, 'pendiente', 'web', null),
       (-1, '21:30', 'Castro', 4, 'sentada', 'web', null), (-1, '22:00', 'Vega', 2, 'no_vino', 'web', null),
@@ -324,8 +326,8 @@ begin
   end if;
   -- Correcciones de la noche (para la lista de la Caja)
   insert into pedido_cambios (hora, jornada, mesa, tipo, nombre, cantidad, importe, motivo, usuario_id, usuario) values
-    (now() - interval '40 minutes', v_hoy, 'Mesa 10', 'sacado', 'Papas fritas', 1, (select precio from productos where nombre = 'Papas fritas'), 'Se equivocó al pedir', v_mozos[1], (select nombre from perfiles where id = v_mozos[1])),
-    (now() - interval '30 minutes', v_hoy, 'Mesa 11', 'invitado', 'Flan mixto', 1, (select precio from productos where nombre = 'Flan mixto'), 'Demoró la cocina', coalesce(v_enc, v_admin), (select nombre from perfiles where id = coalesce(v_enc, v_admin)));
+    (now() - interval '40 minutes', v_hoy, 'Mesa 10', 'sacado', 'Papas bravas', 1, (select precio from productos where nombre = 'Papas bravas'), 'Se equivocó al pedir', v_mozos[1], (select nombre from perfiles where id = v_mozos[1])),
+    (now() - interval '30 minutes', v_hoy, 'Mesa 11', 'invitado', 'Flan', 1, (select precio from productos where nombre = 'Flan'), 'Demoró la cocina', coalesce(v_enc, v_admin), (select nombre from perfiles where id = coalesce(v_enc, v_admin)));
   for v_c in select id from pedido_cambios where jornada = v_hoy and hora > now() - interval '1 hour' loop insert into datos_prueba values ('pedido_cambios', v_c::text) on conflict do nothing; end loop;
 
   -- Pedidos sin mesa en curso: uno para llevar y un delivery
@@ -371,7 +373,9 @@ begin
     insert into datos_prueba values ('pedidos', v_c::text);
     insert into pedido_items (pedido_id, producto_id, nombre, cantidad, precio, estacion, nota)
     select v_c, p.producto_id, p.nombre, sum(i.cantidad), p.precio, p.estacion,
-           case when p.nombre in ('Vacío', 'Bife de chorizo', 'Entraña') and random() < 0.5 then (array['A punto', 'Jugoso', 'Bien cocido'])[1 + floor(random() * 3)::int] end
+           case when p.nombre = 'Napolitana' and random() < 0.6 then 'Sin ajo'
+                when p.nombre = 'Empanada de carne' then (array['Fritas', 'Al horno'])[1 + floor(random() * 2)::int]
+                when p.nombre like 'Hamburguesa%' and random() < 0.3 then 'Sin cebolla' end
     from items_t i join pesos p using (producto_id) group by p.producto_id, p.nombre, p.precio, p.estacion;
     if r.qr then
       insert into llamados (mesa_id, creado) values (v_p, now() - interval '2 minutes') on conflict do nothing;

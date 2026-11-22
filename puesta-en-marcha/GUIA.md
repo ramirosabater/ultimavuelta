@@ -7,7 +7,7 @@ una de **Netlify** (gratis), el repo en GitHub y, para leer facturas y que Chich
 
 1. En <https://supabase.com> → **New project**. Nombre `ultimavuelta`, región **São Paulo** (la más cerca de Rada Tilly). Guardá la contraseña de la base.
 2. **SQL Editor** → New query → pegá todo `1-base.sql` (trae también la tabla de referencia de rendimientos) → **Run**. Tiene que terminar sin errores.
-3. (Opcional) Pegá `3-carta-de-ejemplo.sql` → Run. Carga una carta, artículos, recetas y proveedores de ejemplo para probar.
+3. Pegá `3-carta.sql` → Run. Carga la carta de Última Vuelta (pizzas, hamburguesas, sándwiches, papas, ensaladas, entradas, postres y bebidas) con sus recetas, artículos y proveedores. **Precios, costos y porciones son estimados**: corríjanlos en la app. Si ya tenían cargada la carta de ejemplo, sus platos de parrilla quedan pausados. Si están cargados los datos de prueba, primero borralos (`6-borrar-datos-de-prueba.sql`).
    Después se cambian desde la app.
 4. **Authentication → Users → Add user → Create new user**: tu mail, una contraseña, tildá *Auto Confirm User*.
 5. Abrí `2-primer-administrador.sql`, cambiá el mail y el nombre, pegalo en el SQL Editor → Run.
@@ -75,7 +75,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | `05-pedidos.sql` | Pedidos: para llevar, delivery y barra; sacar, invitar o pasar productos; separar la cuenta; cobrar con varios medios y propina |
 
 ## Datos de prueba (para mostrar la app)
-- `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de ejemplo. Antes tienen que estar pegadas las actualizaciones 01 a 05.
+- `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de `3-carta.sql`. Antes tienen que estar pegadas las actualizaciones 01 a 05.
 - `6-borrar-datos-de-prueba.sql`: saca todo eso y deja la base como estaba. Correlo antes de empezar a usar la app de verdad.
 
 ## Factura electrónica (ARCA)

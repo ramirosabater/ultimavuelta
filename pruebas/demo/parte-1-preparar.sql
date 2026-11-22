@@ -2,7 +2,7 @@
 -- Última Vuelta · DATOS DE PRUEBA (para mostrar la app)
 --   Carga un mes de movimiento inventado: ventas de cada noche, caja, compras, gastos, mermas,
 --   control semanal, rendimientos, reservas y mesas abiertas ahora con comandas en curso.
---   Si la carta está vacía, carga también la carta de ejemplo con sus recetas.
+--   Si la carta está vacía, carga también la carta (3-carta.sql) con sus recetas.
 --
 --   Se pega una vez en Supabase → SQL Editor → Run.
 --   Para sacar todo: 6-borrar-datos-de-prueba.sql (deja la base como estaba antes).
