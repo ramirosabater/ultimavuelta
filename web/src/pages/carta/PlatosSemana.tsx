@@ -1,5 +1,5 @@
 // La semana de platos del día: qué plato va cada día y cuántas porciones, y lo que hay que comprar para eso.
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { leerParametros, rpc, tabla, useConsulta } from '../../lib/datos'
 import { supabase } from '../../lib/supabase'
 import { DIAS, fecha, jornada, num, plata, sumarDias, dow } from '../../lib/formato'
@@ -49,7 +49,7 @@ export default function PlatosSemana() {
   const porciones = planificados.reduce((s, x) => s + (x.porciones ?? 0), 0)
   const costoSemana = planificados.reduce((s, x) => s + (x.porciones ?? 0) * (plato(x.producto_id)?.costo ?? 0), 0)
   const ventaSemana = planificados.reduce((s, x) => s + (x.porciones ?? 0) * Number(plato(x.producto_id)?.precio ?? 0), 0)
-  const compras = sem.compras.map((c) => ({ c, ...falta(c) }))
+  const compras = sem.compras.map((c) => ({ c, ...falta(c) })).sort((a, b) => Number(b.q > 0) - Number(a.q > 0))   // primero lo que hay que comprar
   const aComprar = compras.filter((x) => x.q > 0)
 
   const planificar = (dia: Dia, producto: number | null, porciones: number | null, nombre?: string) =>
@@ -69,80 +69,118 @@ export default function PlatosSemana() {
     navigator.clipboard?.writeText(t).then(() => avisar('Lista copiada. Pegala en WhatsApp.'), () => avisar('No se pudo copiar'))
   }
 
+  // Los tres pasos: cada uno sabe si ya está hecho, y el primero que falta queda marcado como "ahora".
+  const hayPlatos = sem.platos.length > 0
+  const futuros = abiertos.filter((x) => !x.pasado)
+  const vacios = futuros.filter((x) => !x.producto_id)
+  const semanaLista = futuros.length > 0 && vacios.length === 0
+  const pasos = [
+    { n: 1, id: 'paso-platos', t: 'Armá tus platos', hecho: hayPlatos,
+      falta: 'Cargá al menos un plato del día. Se hace una sola vez y después se repite cuando quieras.' },
+    { n: 2, id: 'paso-semana', t: 'Elegí el plato de cada día', hecho: semanaLista,
+      falta: vacios.length ? `${vacios.length === 1 ? 'Falta 1 día' : `Faltan ${vacios.length} días`} sin plato: ${vacios.map((x) => DIAS[dow(x.fecha)]).join(', ')}.` : 'No hay días abiertos esta semana.' },
+    { n: 3, id: 'paso-compras', t: 'Comprá lo que falta', hecho: planificados.length > 0 && aComprar.length === 0,
+      falta: planificados.length ? `Hay ${aComprar.length} ${aComprar.length === 1 ? 'artículo' : 'artículos'} para comprar.` : 'Aparece cuando elijas los platos.' },
+  ]
+  const ahora = pasos.find((x) => !x.hecho)?.n ?? 0
+  const ir = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const Titulo = ({ n, children }: { n: number; children: ReactNode }) => {
+    const ps = pasos[n - 1]
+    return <h3><span className={`fac-n${ps.hecho ? ' hecho' : ''}`}>{ps.hecho ? '✓' : n}</span><span className="grow">{children}</span>
+      {ps.hecho ? <Pill tono="ok">Listo</Pill> : ahora === n ? <Pill tono="acc">Ahora</Pill> : null}</h3>
+  }
+
   return <>
-    <Cabeza etiqueta="Carta y QR" titulo="Platos del día">
-      <button className="btn pri" data-ayuda="nuevo-plato-dia" onClick={() => setVentana({ nuevo: null })}>Nuevo plato</button></Cabeza>
+    <Cabeza etiqueta="Carta y QR" titulo="Platos del día" />
     <SubNavCarta />
-    <p className="muted" style={{ fontSize: 13, margin: '0 0 12px', maxWidth: '72ch' }}>Elegí qué plato va cada día y cuántas porciones preparar. El día que toca se pone solo en la carta (y se saca el anterior). Las porciones sugeridas salen de lo que se vendió de plato del día ese mismo día de la semana. Lo que lleva se suma a la lista de compras.</p>
 
-    <div className="fila" style={{ gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-      <button className="btn sm" disabled={desde <= jornada()} onClick={() => setDesde(sumarDias(desde, -7))}>‹ Anterior</button>
-      <b className="grow" style={{ textAlign: 'center' }}>Del {fecha(desde)} al {fecha(sumarDias(desde, 6))}</b>
-      <button className="btn sm" onClick={() => setDesde(sumarDias(desde, 7))}>Siguiente ›</button>
-    </div>
+    <nav className="pasos" aria-label="Pasos">
+      {pasos.map((x) => <button key={x.n} className={`paso${x.hecho ? ' hecho' : ''}${ahora === x.n ? ' ahora' : ''}`} onClick={() => ir(x.id)}>
+        <span className="fac-n">{x.hecho ? '✓' : x.n}</span>
+        <span><b>{x.t}</b><small>{x.hecho ? 'Listo' : x.falta}</small></span>
+      </button>)}
+    </nav>
+    {ahora === 0 && <div className="aviso ok" style={{ marginBottom: 14 }}>La semana está lista: cada día el plato se pone solo en la carta.</div>}
 
-    <div className="stats" style={{ marginBottom: 14 }}>
-      <Stat label="Días con plato" valor={`${planificados.length} de ${abiertos.length}`} />
-      <Stat label="Porciones" valor={num(porciones)} />
-      <Stat label="Mercadería" valor={plata(costoSemana)} extra={ventaSemana ? `${Math.round(costoSemana / ventaSemana * 100)} % de lo que se vende` : undefined} />
-    </div>
-
-    <section className="panel" style={{ marginBottom: 14 }}>
-      {!sem.platos.length && <div className="notice" style={{ marginBottom: 10 }}><b>Todavía no hay platos del día guardados.</b><br />Tocá <b>Nuevo plato</b>: le ponés nombre, qué lleva y precio, y Chichito calcula la receta.</div>}
-      <div className="rows semana-platos">{sem.dias.map((x) => {
-        const p = plato(x.producto_id), esHoy = x.fecha === sem.hoy
-        const n = porc[x.fecha] ?? (x.porciones != null ? String(x.porciones) : '')
-        return <div className="row" key={x.fecha} style={{ alignItems: 'center', flexWrap: 'wrap', gap: 8, opacity: x.pasado ? 0.65 : 1 }}>
-          <div style={{ minWidth: 92 }}><b>{DIAS[dow(x.fecha)]} {Number(x.fecha.slice(8, 10))}</b>{esHoy && <> <Pill tono="ok">hoy</Pill></>}</div>
-          {x.cerrado ? <span className="muted grow">Cerrado</span> : <>
-            <select id={`ps-p-${x.fecha}`} aria-label={`Plato del ${fecha(x.fecha)}`} value={x.producto_id ?? ''} disabled={x.pasado}
-              onChange={(e) => { const v = e.target.value; if (v === 'nuevo') setVentana({ nuevo: x.fecha }); else planificar(x, v ? Number(v) : null, null) }}
-              style={{ flex: 2, minWidth: 170, width: 'auto' }}>
-              <option value="">Sin plato del día</option>
-              {sem.platos.map((q) => <option key={q.id} value={q.id}>{q.nombre}</option>)}
-              {!x.pasado && <option value="nuevo">＋ Plato nuevo…</option>}
-            </select>
-            {x.producto_id ? <>
-              <label className="fila muted" style={{ gap: 6, fontSize: 13 }}>
-                <input id={`ps-n-${x.fecha}`} type="number" min={1} max={500} inputMode="numeric" value={n} disabled={x.pasado} aria-label="Porciones"
-                  onChange={(e) => setPorc({ ...porc, [x.fecha]: e.target.value })} onBlur={() => guardarPorciones(x)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                  style={{ width: 72 }} /> porciones</label>
-              <span className="mono muted" style={{ fontSize: 12, minWidth: 110, textAlign: 'right' }}>
-                {p && p.con_receta ? <>mercadería {plata(p.costo * (x.porciones ?? 0))}</> : <span style={{ color: 'var(--crit, #b42318)' }}>sin receta</span>}
-                {x.vendidos != null && <><br />vendidas {num(x.vendidos)} de {x.porciones}</>}
-                {!x.pasado && x.sugerido != null && x.porciones !== x.sugerido && <><br />sugeridas {x.sugerido}</>}
-              </span>
-            </> : <span className="grow" />}
-          </>}
-        </div>
-      })}</div>
+    {/* Paso 1 */}
+    <section className="panel fac-paso" id="paso-platos">
+      <Titulo n={1}>Armá tus platos del día</Titulo>
+      <p className="muted paso-ayuda">Nombre, qué lleva y precio. Tocá <b>“Que Chichito calcule la receta”</b> y él estima las cantidades. El plato queda guardado para repetirlo otros días.</p>
+      {hayPlatos && <div className="tbl-wrap" style={{ marginBottom: 10 }}><table><thead><tr><th>Plato</th><th className="r">Precio</th><th className="r">Costo</th><th className="r">Veces</th><th /></tr></thead><tbody>
+        {sem.platos.map((q) => <tr key={q.id}>
+          <td><b>{q.nombre}</b>{q.descripcion && <div className="muted" style={{ fontSize: 12 }}>{q.descripcion}</div>}</td>
+          <td className="r mono">{plata(q.precio)}</td>
+          <td className="r">{q.con_receta ? <><span className="mono">{plata(q.costo)}</span> {pillCosto(q.precio ? q.costo / q.precio : null, objetivo)}</> : <Pill tono="crit">sin receta</Pill>}</td>
+          <td className="r mono">{q.veces}</td>
+          <td className="r"><button className="btn sm ghost" onClick={() => { const pr = prods.find((x) => x.id === q.id); if (pr) setVentana({ editar: pr }) }}>Editar</button></td></tr>)}
+      </tbody></table></div>}
+      <button className={`btn${hayPlatos ? '' : ' pri'}`} data-ayuda="nuevo-plato-dia" onClick={() => setVentana({ nuevo: null })}>＋ Nuevo plato del día</button>
     </section>
 
-    <section className="panel" style={{ marginBottom: 14 }}>
-      <div className="fila" style={{ marginBottom: 6 }}><h3 className="grow">Para comprar</h3>{aComprar.length > 0 && <button className="btn sm" onClick={copiar}>Copiar lista</button>}</div>
-      <p className="muted" style={{ fontSize: 13, margin: '0 0 10px' }}>Lo que llevan los platos que faltan esta semana, contra lo que hay en stock (el stock también lo usa el resto de la carta: la lista general de <b>Stock → Compras</b> ya suma los platos del día de los próximos días).</p>
-      {!compras.length ? <div className="kempty">Planificá algún plato para ver qué hay que comprar.</div>
-        : <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Proveedor</th><th className="r">Lleva</th><th className="r">Hay</th><th className="r">Comprar</th><th className="r">Costo</th></tr></thead><tbody>
+    {/* Paso 2 */}
+    <section className="panel fac-paso" id="paso-semana">
+      <Titulo n={2}>Elegí qué plato va cada día</Titulo>
+      {!hayPlatos ? <div className="kempty">Primero armá un plato en el paso 1.</div> : <>
+        <p className="muted paso-ayuda">Elegí el plato de cada día y revisá las porciones: te ponemos las <b>sugeridas</b> según lo que se vendió ese día de la semana, y las podés cambiar. El día que toca el plato <b>se pone solo en la carta</b> y se saca el anterior.</p>
+        <div className="fila" style={{ gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <button className="btn sm" disabled={desde <= jornada()} onClick={() => setDesde(sumarDias(desde, -7))}>‹ Anterior</button>
+          <b className="grow" style={{ textAlign: 'center' }}>Del {fecha(desde)} al {fecha(sumarDias(desde, 6))}</b>
+          <button className="btn sm" onClick={() => setDesde(sumarDias(desde, 7))}>Siguiente ›</button>
+        </div>
+        <div className="rows semana-platos">{sem.dias.map((x) => {
+          const p = plato(x.producto_id), esHoy = x.fecha === sem.hoy
+          const n = porc[x.fecha] ?? (x.porciones != null ? String(x.porciones) : '')
+          const falta = !x.cerrado && !x.pasado && !x.producto_id
+          return <div className={`row${falta ? ' falta' : ''}`} key={x.fecha} style={{ alignItems: 'center', flexWrap: 'wrap', gap: 8, opacity: x.pasado ? 0.65 : 1 }}>
+            <div style={{ minWidth: 92 }}><b>{DIAS[dow(x.fecha)]} {Number(x.fecha.slice(8, 10))}</b>{esHoy && <> <Pill tono="ok">hoy</Pill></>}</div>
+            {x.cerrado ? <span className="muted grow">Cerrado</span> : <>
+              <select id={`ps-p-${x.fecha}`} aria-label={`Plato del ${fecha(x.fecha)}`} value={x.producto_id ?? ''} disabled={x.pasado}
+                onChange={(e) => { const v = e.target.value; if (v === 'nuevo') setVentana({ nuevo: x.fecha }); else planificar(x, v ? Number(v) : null, null) }}
+                style={{ flex: 2, minWidth: 170, width: 'auto' }}>
+                <option value="">{x.pasado ? 'Sin plato del día' : '— Elegí el plato —'}</option>
+                {sem.platos.map((q) => <option key={q.id} value={q.id}>{q.nombre}</option>)}
+                {!x.pasado && <option value="nuevo">＋ Plato nuevo…</option>}
+              </select>
+              {x.producto_id ? <>
+                <label className="fila muted" style={{ gap: 6, fontSize: 13 }}>
+                  <input id={`ps-n-${x.fecha}`} type="number" min={1} max={500} inputMode="numeric" value={n} disabled={x.pasado} aria-label="Porciones"
+                    onChange={(e) => setPorc({ ...porc, [x.fecha]: e.target.value })} onBlur={() => guardarPorciones(x)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                    style={{ width: 72 }} /> porciones</label>
+                <span className="mono muted" style={{ fontSize: 12, minWidth: 110, textAlign: 'right' }}>
+                  {p && p.con_receta ? <>mercadería {plata(p.costo * (x.porciones ?? 0))}</> : <span style={{ color: 'var(--crit, #b42318)' }}>sin receta</span>}
+                  {x.vendidos != null && <><br />vendidas {num(x.vendidos)} de {x.porciones}</>}
+                  {!x.pasado && x.sugerido != null && x.porciones !== x.sugerido && <><br /><button className="link" onClick={() => planificar(x, x.producto_id, x.sugerido)}>usar sugeridas ({x.sugerido})</button></>}
+                </span>
+              </> : <span className="grow" />}
+            </>}
+          </div>
+        })}</div>
+        <div className="stats" style={{ marginTop: 12 }}>
+          <Stat label="Días con plato" valor={`${planificados.length} de ${abiertos.length}`} />
+          <Stat label="Porciones" valor={num(porciones)} />
+          <Stat label="Mercadería" valor={plata(costoSemana)} extra={ventaSemana ? `${Math.round(costoSemana / ventaSemana * 100)} % de lo que se vende` : undefined} />
+        </div>
+      </>}
+    </section>
+
+    {/* Paso 3 */}
+    <section className="panel fac-paso" id="paso-compras">
+      <Titulo n={3}>Comprá lo que falta</Titulo>
+      {!planificados.length ? <div className="kempty">Cuando elijas los platos de la semana (paso 2), acá aparece lo que hay que comprar.</div> : <>
+        <p className="muted paso-ayuda">Lo que llevan los platos de esta semana contra lo que hay en stock. Tocá <b>Copiar lista</b> y pegala en WhatsApp al proveedor. (Esto también se suma solo a <b>Stock → Compras</b>.)</p>
+        {!aComprar.length && <div className="aviso ok" style={{ marginBottom: 10 }}>Con lo que hay en stock alcanza para los platos de la semana.</div>}
+        <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th>Proveedor</th><th className="r">Lleva</th><th className="r">Hay</th><th className="r">Comprar</th><th className="r">Costo</th></tr></thead><tbody>
           {compras.map(({ c, q, packs }) => <tr key={c.id} style={q ? undefined : { opacity: 0.55 }}>
             <td><b>{c.nombre}</b></td><td className="muted">{c.proveedor ?? '—'}</td>
             <td className="r mono">{num(c.necesita)} {c.unidad}</td><td className="r mono">{num(Math.max(0, c.hay))}</td>
             <td className="r mono">{q ? (packs ? `${packs} ${c.pack_nombre ?? 'pack'}${packs > 1 ? 's' : ''}` : `${num(q)} ${c.unidad}`) : 'alcanza'}</td>
             <td className="r mono">{q ? plata(q * c.costo) : ''}</td></tr>)}
-        </tbody></table></div>}
-      {aComprar.length > 0 && <div className="muted" style={{ fontSize: 13, marginTop: 8, textAlign: 'right' }}>Total estimado <b className="mono">{plata(aComprar.reduce((s, x) => s + x.q * x.c.costo, 0))}</b></div>}
+        </tbody></table></div>
+        {aComprar.length > 0 && <div className="fila" style={{ marginTop: 10, gap: 10, flexWrap: 'wrap' }}>
+          <span className="muted grow" style={{ fontSize: 13 }}>Total estimado <b className="mono">{plata(aComprar.reduce((s, x) => s + x.q * x.c.costo, 0))}</b></span>
+          <button className="btn pri" onClick={copiar}>Copiar lista</button></div>}
+      </>}
     </section>
-
-    {sem.platos.length > 0 && <section className="panel">
-      <h3 style={{ marginBottom: 6 }}>Platos guardados</h3>
-      <div className="tbl-wrap"><table><thead><tr><th>Plato</th><th className="r">Precio</th><th className="r">Costo</th><th className="r">Veces</th><th /></tr></thead><tbody>
-        {sem.platos.map((q) => <tr key={q.id}>
-          <td><b>{q.nombre}</b>{q.descripcion && <div className="muted" style={{ fontSize: 12 }}>{q.descripcion}</div>}</td>
-          <td className="r mono">{plata(q.precio)}</td>
-          <td className="r">{q.con_receta ? <><span className="mono">{plata(q.costo)}</span> {pillCosto(q.precio ? q.costo / q.precio : null, objetivo)}</> : <span className="muted" style={{ fontSize: 12 }}>sin receta</span>}</td>
-          <td className="r mono">{q.veces}</td>
-          <td className="r"><button className="btn sm ghost" onClick={() => { const pr = prods.find((x) => x.id === q.id); if (pr) setVentana({ editar: pr }) }}>Editar</button></td></tr>)}
-      </tbody></table></div>
-    </section>}
 
     {ventana && <PlatoDelDia cats={cats} prods={prods} rec={rec} ins={ins} objetivo={objetivo} planificar inicial={'editar' in ventana ? ventana.editar : undefined}
       onCerrar={() => setVentana(null)}

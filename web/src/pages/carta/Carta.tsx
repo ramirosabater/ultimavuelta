@@ -167,11 +167,14 @@ export function PlatoDelDia({ cats, prods, rec, ins, objetivo, planificar = fals
         {anteriores.slice(0, 12).map((p) => <button key={p.id} className="chip" aria-pressed={desde?.id === p.id} onClick={() => elegir(p)}>{p.nombre}{p.activo ? ' · hoy' : ''}</button>)}
       </div>
     </div>}
+    <div className="sub-paso"><span className="fac-n">1</span><b>El plato</b><small>cómo se llama y qué lleva</small></div>
     <label className="campo">Nombre<input id="pd-nom" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} placeholder="Bondiola braseada" autoFocus /></label>
     <label className="campo">Qué lleva (se ve en el QR y ayuda a calcular la receta)<input id="pd-desc" value={f.descripcion} onChange={(e) => setF({ ...f, descripcion: e.target.value })} placeholder="Con puré de calabaza y salsa de hongos" /></label>
+    <div className="sub-paso"><span className="fac-n">2</span><b>La receta</b><small>{f.nombre.trim().length < 2 ? 'primero poné el nombre' : 'tocá el botón y Chichito calcula las cantidades por porción'}</small></div>
     <EstimarReceta nombre={f.nombre} descripcion={f.descripcion} insumos={ins} onFilas={(x, p) => { setFilas(x); setPorcion(p) }} />
     {porcion && <div className="notice" style={{ fontSize: 13 }}>Chichito la calculó para <b>{porcion}</b>. Revisá las cantidades: los artículos nuevos se crean con stock en cero y el costo se corrige solo con la primera compra.</div>}
     <FilasReceta filas={filas} setFilas={setFilas} insumos={ins} />
+    <div className="sub-paso"><span className="fac-n">3</span><b>El precio</b><small>{sugerido != null ? 'podés usar el sugerido según el costo' : 'cuando esté la receta te sugerimos uno'}</small></div>
     <div className="two">
       <label className="campo">Precio ($)<input id="pd-precio" type="number" step="any" min={0} inputMode="decimal" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })} /></label>
       {sugerido != null && <div className="campo"><span>Precio sugerido</span><div className="fila"><span className="mono">{plata(sugerido)}</span><span className="muted" style={{ fontSize: 12 }}>({Math.round(objetivo * 100)} % de costo)</span>

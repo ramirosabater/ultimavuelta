@@ -225,3 +225,21 @@ label.btn.disabled { opacity: .45; pointer-events: none; }
   .fac-pagina { padding: 0; max-width: none; }
   .fac { border: 0; padding: 0; }
 }
+
+/* Pasos numerados (plato del día y otros asistentes) */
+.fac-n.hecho { background: var(--ok); color: #fff; }
+.fac-paso { scroll-margin-top: 70px; }
+.paso-ayuda { font-size: 13px; margin: -4px 0 12px; max-width: 72ch; }
+.pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.paso { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); cursor: pointer; font: inherit; }
+.paso b { display: block; font-size: 14px; }
+.paso small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.paso .fac-n { flex: none; }
+.paso.ahora { border: 2px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.paso.hecho small { color: var(--ok); }
+.semana-platos .row.falta { background: var(--warn-soft); border-radius: 8px; }
+@media (max-width: 700px) { .pasos { grid-template-columns: 1fr; } }
+.sub-paso { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 -2px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sub-paso:first-child, .chips + .sub-paso { border-top: 0; }
+.sub-paso .fac-n { width: 22px; height: 22px; font-size: 12px; }
+.sub-paso small { color: var(--muted); font-size: 12px; }
