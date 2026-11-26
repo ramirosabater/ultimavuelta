@@ -9,7 +9,7 @@ import { chapaMesa, etiquetaMesa } from '../lib/mesas'
 import { hora } from '../lib/reservas'
 import { Sentar, momentoReserva } from '../components/reservas'
 import { AbrirCuenta, AbrirMesa, CargarPedido, Cobrar, CorregirItem, Items, MoverMesa, PasarItems } from '../components/salon'
-import { Cabeza, Pill, useAccion } from '../components/ui'
+import { Cabeza, Modal, Pill, useAccion } from '../components/ui'
 
 const ESTADO = { pendiente: 'Pendiente', preparando: 'En preparación', listo: 'Listo', entregado: 'Entregado' } as const
 const TONO = { pendiente: 'warn', preparando: 'acc', listo: 'ok', entregado: '' } as const
@@ -30,7 +30,7 @@ function etapa(m: Mesa, ps: Pedido[]): { n: number; txt: string; donde?: string 
   return { n: 1, txt: 'Sentados', donde: 'sin pedido todavía' }
 }
 
-type Ventana = null | 'cuenta' | { tipo: 'abrir' | 'pedido' | 'cobrar' | 'mover' | 'separar'; mesa: Mesa } | { tipo: 'item'; mesa: Mesa; item: PedidoItem; prep: boolean }
+type Ventana = null | 'cuenta' | { tipo: 'abrir' | 'pedido' | 'cobrar' | 'mover' | 'separar' | 'juntar'; mesa: Mesa } | { tipo: 'item'; mesa: Mesa; item: PedidoItem; prep: boolean }
 
 export default function Mesas() {
   const { gestion } = useAuth()
@@ -72,12 +72,21 @@ export default function Mesas() {
   const mesa = sel ? mesas.find((m) => m.id === sel) ?? null : null
   const listo = () => { setVentana(null); recargar() }
 
+  const juntasDe = (id: number) => mesas.filter((x) => x.junta_con === id)
   const tarjeta = (m: Mesa) => {
-    const ps = deMesa(m.id), tot = totalMesa(m.id)
+    if (m.junta_con) {
+      const pr = mesaDe(m.junta_con)
+      return <button key={m.id} className={`mesa ocupada junta${sel === m.junta_con ? ' sel' : ''}`} onClick={() => setSel(m.junta_con!)} aria-label={`Mesa ${m.numero}, junta con la ${pr?.numero}`}>
+        <span className="n">{chapaMesa(m)}</span>
+        <span className="etapa"><b>🔗 Junta con la {pr?.numero}</b><small>todo se carga en la {pr?.numero}</small></span>
+      </button>
+    }
+    const ps = deMesa(m.id), tot = totalMesa(m.id), juntas = juntasDe(m.id)
     const llama = llamados.some((l) => l.mesa_id === m.id)
     const e = etapa(m, ps)
     return <button key={m.id} className={`mesa ${m.estado}${m.temporal ? ' suelta' : ''}${sel === m.id ? ' sel' : ''}${e ? ` etapa-${e.n}` : ''}`} onClick={() => setSel(sel === m.id ? null : m.id)} aria-label={etiquetaMesa(m)}>
       <span className="n">{chapaMesa(m)}</span>
+      {juntas.length > 0 && <span className="juntas">+ {juntas.map((x) => x.numero).join(' + ')}</span>}
       {m.temporal && <span className="quien">{m.nombre}</span>}
       {e ? <span className="etapa" title={e.donde}>
           <span className="etapa-bar" aria-hidden="true">{CIRCUITO.map((_, i) => <i key={i} className={i + 1 < e.n ? 'h' : i + 1 === e.n ? 'a' : ''} />)}</span>
@@ -131,7 +140,7 @@ export default function Mesas() {
       </div>
 
       {mesa && <aside className="panel side" data-ayuda="panel-mesa">
-        <div className="fila"><div className="grow"><div className="label">{mesa.temporal ? ({ llevar: 'Para llevar', delivery: 'Delivery', barra: 'Barra', aparte: 'Cuenta aparte', mesa: 'Mesa' } as const)[mesa.tipo] : 'Mesa'}</div><h2>{mesa.temporal ? mesa.nombre : mesa.numero}</h2></div><button className="btn sm ghost" onClick={() => setSel(null)}>Cerrar</button></div>
+        <div className="fila"><div className="grow"><div className="label">{mesa.temporal ? ({ llevar: 'Para llevar', delivery: 'Delivery', barra: 'Barra', aparte: 'Cuenta aparte', mesa: 'Mesa' } as const)[mesa.tipo] : 'Mesa'}</div><h2>{mesa.temporal ? mesa.nombre : mesa.numero}{juntasDe(mesa.id).length > 0 && <span className="juntas-h"> + {juntasDe(mesa.id).map((x) => x.numero).join(' + ')}</span>}</h2></div><button className="btn sm ghost" onClick={() => setSel(null)}>Cerrar</button></div>
         {mesa.estado !== 'libre' ? <dl className="kv">
           <dt>Estado</dt><dd>{(() => { const e = etapa(mesa, deMesa(mesa.id)); return e ? <><Pill tono={e.n === 4 ? 'ok' : e.n === 6 ? 'acc' : e.n === 2 || e.n === 3 ? 'warn' : ''}>{e.n} · {e.txt}</Pill>{e.donde && <small className="muted"> {e.donde}</small>}</> : <Pill>Ocupada</Pill> })()}</dd>
           <dt>Abierta</dt><dd className="mono">{hhmm(mesa.abierta!)} · {duracion(minutosDesde(mesa.abierta!))}</dd>
@@ -140,6 +149,8 @@ export default function Mesas() {
           {mesa.comensales ? <><dt>Comensales</dt><dd className="mono">{mesa.comensales}</dd></> : null}
           {mesa.mozo_id && nombres.get(mesa.mozo_id) ? <><dt>Mozo</dt><dd>{nombres.get(mesa.mozo_id)}</dd></> : null}
         </dl> : <p className="muted" style={{ margin: '8px 0 12px' }}>Mesa libre.</p>}
+        {juntasDe(mesa.id).length > 0 && <div className="juntas-panel"><span className="grow">🔗 Juntas con esta: {juntasDe(mesa.id).map((x) => <button key={x.id} className="chip" title={`Separar la mesa ${x.numero}`} disabled={ocupado} onClick={() => accion(() => rpc('separar_mesa', { p_mesa: x.id }), `Mesa ${x.numero} separada`)}>Mesa {x.numero} ✕</button>)}</span>
+          <small className="muted">Tocá una para separarla. Al cobrar, se liberan todas.</small></div>}
 
         {deMesa(mesa.id).map((p) => <div key={p.id} className="comanda">
           <div className="comanda-h">
@@ -161,11 +172,13 @@ export default function Mesas() {
         {deMesa(mesa.id).length > 0 && <div className="total-row"><span className="label">Total mesa</span><span className="num">{plata(totalMesa(mesa.id))}</span></div>}
 
         <div className="actions">
-          {mesa.estado === 'libre' ? <button className="btn pri" onClick={() => setVentana({ tipo: 'abrir', mesa })}>Abrir mesa</button> : <>
+          {mesa.estado === 'libre' ? <><button className="btn pri" onClick={() => setVentana({ tipo: 'abrir', mesa })}>Abrir mesa</button>
+            <button className="btn" data-ayuda="juntar" onClick={() => setVentana({ tipo: 'juntar', mesa })}>Juntar con otras mesas</button></> : <>
             <button className="btn pri" onClick={() => setVentana({ tipo: 'pedido', mesa })}>Agregar pedido</button>
             {mesa.estado !== 'cuenta' && <button className="btn" disabled={ocupado} onClick={() => accion(() => rpc('pedir_cuenta', { p_mesa: mesa.id }), `${etiquetaMesa(mesa)} pidió la cuenta`)}>Pidió la cuenta</button>}
             {deMesa(mesa.id).some((p) => p.confirmado) && <button className="btn" onClick={() => setVentana({ tipo: 'cobrar', mesa })}>Cobrar</button>}
             {deMesa(mesa.id).some((p) => p.confirmado) && <button className="btn ghost" onClick={() => setVentana({ tipo: 'separar', mesa })} data-ayuda="separar">Separar o pasar productos</button>}
+            {!mesa.temporal && <button className="btn ghost" data-ayuda="juntar" onClick={() => setVentana({ tipo: 'juntar', mesa })}>Juntar con otras mesas</button>}
             {!mesa.temporal && <button className="btn ghost" onClick={() => setVentana({ tipo: 'mover', mesa })}>Pasar a otra mesa</button>}
             {!deMesa(mesa.id).some((p) => p.confirmado) && <button className="btn ghost danger" disabled={ocupado} onClick={async () => { await accion(() => rpc('liberar_mesa', { p_mesa: mesa.id }), 'Mesa liberada'); setSel(null) }}>Liberar mesa</button>}
           </>}
@@ -182,7 +195,31 @@ export default function Mesas() {
     {ventana && typeof ventana === 'object' && ventana.tipo === 'pedido' && <CargarPedido mesa={ventana.mesa} onCerrar={() => setVentana(null)} onListo={listo} />}
     {ventana && typeof ventana === 'object' && ventana.tipo === 'cobrar' && <Cobrar mesa={ventana.mesa} items={deMesa(ventana.mesa.id).filter((p) => p.confirmado).flatMap((p) => p.pedido_items ?? [])}
       onCerrar={() => setVentana(null)} onListo={() => { setSel(null); listo() }} />}
+    {ventana && typeof ventana === 'object' && ventana.tipo === 'juntar' && <JuntarMesas mesa={ventana.mesa} mesas={fijas} onCerrar={() => setVentana(null)} onListo={() => { setSel(ventana.mesa.id); listo() }} />}
     {sentar && <Sentar r={sentar} mesas={fijas} onCerrar={() => setSentar(null)} onListo={() => { setSentar(null); recargar() }} />}
     {ventana && typeof ventana === 'object' && ventana.tipo === 'mover' && <MoverMesa mesa={ventana.mesa} mesas={mesas} onCerrar={() => setVentana(null)} onListo={() => { setSel(null); listo() }} />}
   </>
+}
+
+/** Juntar mesas para un grupo grande: todo se carga y se cobra en la principal */
+function JuntarMesas({ mesa, mesas, onCerrar, onListo }: { mesa: Mesa; mesas: Mesa[]; onCerrar: () => void; onListo: () => void }) {
+  const ya = mesas.filter((m) => m.junta_con === mesa.id).map((m) => m.id)
+  const candidatas = mesas.filter((m) => m.id !== mesa.id && m.activa && !mesas.some((x) => x.junta_con === m.id) && (m.junta_con == null || m.junta_con === mesa.id))
+  const [elegidas, setElegidas] = useState<number[]>([])
+  const { correr, ocupado } = useAccion()
+  const nums = elegidas.map((id) => mesas.find((m) => m.id === id)?.numero).sort((a, b) => (a ?? 0) - (b ?? 0))
+  const conCosas = elegidas.filter((id) => mesas.find((m) => m.id === id)?.estado !== 'libre').length
+  return <Modal titulo={`Juntar con la mesa ${mesa.numero}`} onCerrar={onCerrar}
+    pie={<><span className="grow muted" style={{ fontSize: 13 }}>{elegidas.length ? `Mesa ${mesa.numero} + ${nums.join(' + ')}` : 'Elegí las mesas'}</span>
+      <button className="btn pri" id="jm-ok" disabled={ocupado || !elegidas.length} onClick={async () => {
+        if (await correr(() => rpc('juntar_mesas', { p_principal: mesa.id, p_otras: elegidas }), `Mesas juntas: ${mesa.numero} + ${nums.join(' + ')}`)) onListo()
+      }}>Juntar</button></>}>
+    <p style={{ margin: 0 }}>Para un grupo grande. Todo se carga y se cobra en la <b>mesa {mesa.numero}</b>{mesa.estado === 'libre' ? ', que queda abierta' : ''}. El QR de cualquiera de las mesas pide en la {mesa.numero}. Al cobrar, se liberan todas.</p>
+    {candidatas.length ? <div className="opts" id="jm-mesas">{candidatas.map((m) => {
+      const ok = elegidas.includes(m.id) || ya.includes(m.id)
+      return <button key={m.id} className="opt" aria-pressed={ok} disabled={ya.includes(m.id)} onClick={() => setElegidas(ok ? elegidas.filter((x) => x !== m.id) : [...elegidas, m.id])}>
+        Mesa {m.numero}{ya.includes(m.id) ? ' · ya junta' : m.estado !== 'libre' ? ' · ocupada' : ''}</button>
+    })}</div> : <div className="kempty">No hay otras mesas para juntar.</div>}
+    {conCosas > 0 && <div className="notice" style={{ fontSize: 13 }}>Lo que ya está cargado en {conCosas === 1 ? 'la mesa ocupada' : 'las mesas ocupadas'} pasa a la mesa {mesa.numero}.</div>}
+  </Modal>
 }

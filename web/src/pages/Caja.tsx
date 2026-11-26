@@ -64,7 +64,7 @@ export default function Caja() {
   const egresos = gastos.reduce((s, g) => s + Number(g.monto), 0)
   const itemsDe = (m: Mesa) => pedidos.filter((p) => p.mesa_id === m.id).flatMap((p) => p.pedido_items ?? [])
   const totalMesa = (m: Mesa) => itemsDe(m).reduce((s, i) => s + i.cantidad * i.precio, 0)
-  const porCobrar = [...mesas].filter((m) => m.activa).sort((a, b) => (a.estado === 'cuenta' ? 0 : 1) - (b.estado === 'cuenta' ? 0 : 1) || a.numero - b.numero)
+  const porCobrar = [...mesas].filter((m) => m.activa && !m.junta_con).sort((a, b) => (a.estado === 'cuenta' ? 0 : 1) - (b.estado === 'cuenta' ? 0 : 1) || a.numero - b.numero)
   const movs = [
     ...tickets.map((t) => ({ t, h: t.hora, txt: `${t.mesa_nombre ?? `Mesa ${t.mesa_numero ?? '—'}`} · ${(t.ticket_items ?? []).reduce((s, i) => s + i.cantidad, 0)} ítems`, med: mediosDe(t) + (Number(t.descuento_pct) ? ` · ${t.descuento_pct}% desc.` : '') + (Number(t.propina) ? ` · propina ${plata(t.propina!)}` : ''), m: Number(t.total) })),
     ...gastos.map((g) => ({ t: null as Ticket | null, h: g.creado, txt: `Gasto: ${g.concepto}`, med: 'Efectivo', m: -Number(g.monto) })),

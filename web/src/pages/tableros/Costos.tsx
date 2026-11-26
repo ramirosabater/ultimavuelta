@@ -6,7 +6,8 @@ import type { Insumo, Producto, RecetaItem } from '../../lib/tipos'
 import { BarraFiltros, filtrosBase, SubNavTableros, useFiltros, type Clave } from './filtros'
 import { EditarReceta } from '../stock/Recetas'
 import { pillCosto } from '../../components/stock'
-import { Barras, Cabeza, Delta, Pill, Ranking, Stat } from '../../components/ui'
+import { Barras, Cabeza, Pill, Stat } from '../../components/ui'
+import { Anillo, Bloque, Dona, Kpi, Podio, Variacion, color, corto, emoji } from '../../components/tablero'
 
 interface Plato { id: number; nombre: string; cantidad: number; vendido: number; costo_hist: number; precio: number; costo_unit: number; con_receta: boolean }
 interface Costos {
@@ -31,22 +32,41 @@ export default function TableroCostos() {
     const [p, rec, ins] = await Promise.all([tabla<Producto[]>(supabase.from('productos').select('*').eq('id', id)), tabla<RecetaItem[]>(supabase.from('receta_items').select('*').eq('producto_id', id)), tabla<Insumo[]>(supabase.from('insumos').select('*').order('nombre'))])
     if (p[0]) setReceta({ p: p[0], rec, ins })
   }
-  const d = (a: number, b: number | undefined, inv?: boolean) => F.comparar && r?.prev ? <Delta a={Number(a)} b={b == null ? null : Number(b)} inverso={inv} /> : undefined
+  const v = (a: number, b: number | undefined, inv?: boolean) => F.comparar && r?.prev ? <Variacion a={Number(a)} b={b == null ? null : Number(b)} inverso={inv} texto="vs. antes" /> : undefined
 
   return <>
     <Cabeza etiqueta="Tableros" titulo="Costos y desperdicio" />
     <SubNavTableros />
     <BarraFiltros F={F} setF={setF} claves={CLAVES} />
     {error ? <div className="aviso bad">{error}</div> : !r ? <p className="cargando">Calculando…</p> : <div style={{ opacity: cargando ? 0.6 : 1 }}>
-      <div className="stats" style={{ marginBottom: 16 }}>
-        <Stat label="Ventas" valor={plata(r.kpi.ventas)} extra={d(r.kpi.ventas, r.prev?.ventas)} />
-        <Stat label={r.kpi.solo_articulos ? 'Costo de esos artículos' : 'Costo de mercadería'} valor={plata(r.kpi.costo)} extra={Number(r.kpi.ventas) ? <span className="muted">{pct(Number(r.kpi.costo) / Number(r.kpi.ventas))} de las ventas</span> : undefined} />
-        {!r.kpi.solo_articulos && <Stat label="Margen bruto" valor={plata(Number(r.kpi.ventas) - Number(r.kpi.costo))} extra={r.prev ? d(Number(r.kpi.ventas) - Number(r.kpi.costo), Number(r.prev.ventas) - Number(r.prev.costo)) : undefined} />}
-        <Stat label="Tirado (mermas)" valor={plata(r.kpi.tirado)} extra={d(r.kpi.tirado, r.prev?.tirado, true)} />
-        <Stat label="Compras" valor={plata(r.kpi.compras)} extra={<span className="muted">{r.kpi.n_compras} compra{r.kpi.n_compras === 1 ? '' : 's'}</span>} />
-      </div>
+      {(() => { const vt = Number(r.kpi.ventas), co = Number(r.kpi.costo), ti = Number(r.kpi.tirado), cp = vt ? co / vt : null, mg = vt - co
+        return <>
+        <div className="kpis">
+          <Kpi titulo="Ventas" icono="💰" color={color(0)} valor={plata(vt)} pie={v(vt, r.prev?.ventas)} />
+          <Kpi titulo={r.kpi.solo_articulos ? 'Costo de esos artículos' : 'Costo de mercadería'} icono="🥩" color={color(2)} valor={plata(co)} pie={cp != null ? `${pct(cp, 1)} de las ventas` : undefined} />
+          {!r.kpi.solo_articulos && <Kpi titulo="Margen bruto" icono="📈" color={color(3)} valor={plata(mg)} pie={r.prev ? v(mg, Number(r.prev.ventas) - Number(r.prev.costo)) : 'ventas menos mercadería'} />}
+          <Kpi titulo="Tirado (mermas)" icono="🗑️" color={color(5)} valor={plata(ti)} pie={v(ti, r.prev?.tirado, true)} />
+          <Kpi titulo="Compras" icono="🛒" color={color(1)} valor={plata(r.kpi.compras)} pie={`${r.kpi.n_compras} compra${r.kpi.n_compras === 1 ? '' : 's'}`} />
+        </div>
+        {!r.kpi.solo_articulos && vt > 0 && <div className="tb">
+          <Bloque className="s5" titulo="¿Cómo venimos?" ayuda="rentabilidad">
+            <div className="anillos">
+              <div><Anillo p={cp ?? 0} marca={objetivo} c={cp != null && cp > objetivo ? 'var(--crit)' : 'var(--t4)'} centro={pct(cp ?? 0)} sub="costo" />
+                <span><b>Costo de mercadería</b><br /><span className="muted">la rayita es tu objetivo ({pct(objetivo)})</span></span></div>
+              <div><Anillo p={mg / vt} c="var(--t2)" centro={pct(mg / vt)} sub="margen" /><span><b>Margen bruto</b><br /><span className="muted">lo que queda de cada venta</span></span></div>
+              <div><Anillo p={co + ti ? ti / (co + ti) : 0} marca={0.03} c={co + ti && ti / (co + ti) > 0.06 ? 'var(--crit)' : 'var(--t3)'} centro={pct(co + ti ? ti / (co + ti) : 0, 1)} sub="tirado" />
+                <span><b>Desperdicio</b><br /><span className="muted">sano: menos del 3 %</span></span></div>
+            </div>
+          </Bloque>
+          <Bloque className="s7" titulo="Los platos que más plata dejan" der="margen generado en el período">
+            <Podio filas={r.platos.filter((p) => p.con_receta).map((p) => ({ p, m: Number(p.vendido) - Number(p.costo_hist) })).sort((x, y) => y.m - x.m).slice(0, 6).map(({ p, m }) => ({
+              nombre: <>{emoji(p.nombre)} {p.nombre}</>, v: m, sub: `${p.cantidad} vendidos · deja ${plata(Number(p.precio) - Number(p.costo_unit))} c/u`,
+              der: pillCosto(Number(p.precio) ? Number(p.costo_unit) / Number(p.precio) : null, objetivo) }))} />
+          </Bloque>
+        </div>}
+        </> })()}
 
-      {r.plato && <section className="panel" style={{ marginBottom: 16 }}>
+      {r.plato && <section className="bloque tb-sep">
         <div className="fila"><h3 className="grow">{r.plato.nombre}</h3>{pillCosto(r.plato.receta.length ? Number(r.plato.costo) / Number(r.plato.precio) : null, objetivo)}
           <button className="btn sm" onClick={() => abrirReceta(r.plato!.id)}>Editar receta</button></div>
         <div className="stats" style={{ margin: '10px 0' }}>
@@ -58,7 +78,7 @@ export default function TableroCostos() {
         </tbody></table></div> : <div className="kempty">Este plato no tiene receta cargada.</div>}
       </section>}
 
-      {r.articulo && <section className="panel" style={{ marginBottom: 16 }}>
+      {r.articulo && <section className="bloque tb-sep">
         <h3>{r.articulo.nombre}</h3>
         <div className="stats" style={{ margin: '10px 0' }}>
           <Stat label="Costo actual" valor={<>{plata(r.articulo.costo)}<span className="muted" style={{ fontSize: 13 }}>/{r.articulo.unidad}</span></>} />
@@ -71,22 +91,22 @@ export default function TableroCostos() {
         <p className="muted" style={{ fontSize: 13, margin: '8px 0 0' }}>Lo usan: {r.articulo.platos.length ? r.articulo.platos.join(', ') : 'ningún plato'}.</p>
       </section>}
 
-      <section className="panel" style={{ marginBottom: 16 }} data-ayuda="rentabilidad"><h3 style={{ marginBottom: 6 }}>Rentabilidad por plato</h3>
+      <details className="bloque" style={{ marginBottom: 16 }}><summary style={{ cursor: 'pointer' }}><b>Rentabilidad de todos los platos</b> <span className="muted">({r.platos.length})</span></summary><div style={{ height: 10 }} />
         {r.platos.length ? <div className="tbl-wrap"><table><thead><tr><th>Plato</th><th className="r">Vendidos</th><th className="r">Precio</th><th className="r">Costo</th><th className="r">Deja c/u</th><th className="r">Margen generado</th><th /></tr></thead><tbody>
           {r.platos.map((p) => <tr key={p.id}><td><b>{p.nombre}</b></td><td className="r mono">{p.cantidad}</td><td className="r mono">{plata(p.precio)}</td>
             <td className="r mono">{p.con_receta ? plata(p.costo_unit) : '—'}</td><td className="r mono">{p.con_receta ? plata(Number(p.precio) - Number(p.costo_unit)) : '—'}</td>
             <td className="r mono"><b>{plata(Number(p.vendido) - Number(p.costo_hist))}</b></td><td>{pillCosto(p.con_receta && Number(p.precio) ? Number(p.costo_unit) / Number(p.precio) : null, objetivo)}</td></tr>)}
         </tbody></table></div> : <div className="kempty">Sin ventas con estos filtros.</div>}
-      </section>
+      </details>
 
       <Matriz platos={r.platos.filter((p) => p.con_receta)} />
 
-      <div className="rep-grid" style={{ marginTop: 0 }}>
-        <section className="panel"><h3 style={{ marginBottom: 10 }}>Mermas por motivo</h3><Ranking filas={r.mermas_motivo} color="var(--crit)" conPct={false} /></section>
-        <section className="panel"><h3 style={{ marginBottom: 10 }}>Mermas por artículo</h3><Ranking filas={r.mermas_articulo.map((m) => ({ nombre: m.nombre, v: Number(m.v), extra: <span className="muted mono" style={{ fontSize: 12 }}>{num(m.cantidad)} {m.unidad}</span> }))} color="var(--crit)" conPct={false} /></section>
+      <div className="tb">
+        <Bloque className="s5" titulo="Por qué se tira"><Dona filas={r.mermas_motivo.map((m) => ({ nombre: m.nombre, v: Number(m.v) }))} centro={<><b>{corto(Number(r.kpi.tirado))}</b>tirado</>} /></Bloque>
+        <Bloque className="s7" titulo="Qué se tira"><Podio filas={r.mermas_articulo.slice(0, 8).map((m) => ({ nombre: m.nombre, v: Number(m.v), sub: `${num(m.cantidad)} ${m.unidad}` }))} /></Bloque>
       </div>
-      <section className="panel" style={{ marginTop: 16 }}><h3 style={{ marginBottom: 8 }}>Cambios de precio en el período</h3>
-        {r.cambios_precio.length ? <div className="rows">{r.cambios_precio.map((x) => <div key={x.nombre} className="row"><span className="grow">{x.nombre}</span><Pill tono={x.cambio > 0 ? 'crit' : 'ok'}>{x.cambio > 0 ? '+' : '−'}{pct(Math.abs(x.cambio), 1)}</Pill></div>)}</div>
+      <section className="bloque"><h3 style={{ marginBottom: 8 }}>Cambios de precio en el período</h3>
+        {r.cambios_precio.length ? <div className="chips-precio">{r.cambios_precio.map((x) => <span key={x.nombre}>{x.nombre}<Pill tono={x.cambio > 0 ? 'crit' : 'ok'}>{x.cambio > 0 ? '▲' : '▼'} {pct(Math.abs(x.cambio), 1)}</Pill></span>)}</div>
           : <div className="kempty">Sin cambios de precio registrados.</div>}
       </section>
     </div>}
@@ -96,23 +116,21 @@ export default function TableroCostos() {
 
 /** Cruza cuánto se vende cada plato con cuánto deja por unidad */
 function Matriz({ platos }: { platos: Plato[] }) {
-  if (platos.length < 4) return <div className="notice" style={{ marginBottom: 16 }}><b>Qué platos convienen</b><br />Aparece cuando haya ventas de al menos 4 platos con receta en el período.</div>
+  if (platos.length < 4) return <div className="notice tb-sep"><b>Qué platos convienen</b><br />Aparece cuando haya ventas de al menos 4 platos con receta en el período.</div>
   const deja = (p: Plato) => Number(p.precio) - Number(p.costo_unit)
   const qm = (platos.reduce((s, p) => s + Number(p.cantidad), 0) / platos.length) * 0.7
   const mm = platos.reduce((s, p) => s + deja(p) * Number(p.cantidad), 0) / platos.reduce((s, p) => s + Number(p.cantidad), 0)
   const g: Record<string, Plato[]> = { estrella: [], caballo: [], enigma: [], perro: [] }
   for (const p of platos) { const pop = Number(p.cantidad) >= qm, rent = deja(p) >= mm; g[pop && rent ? 'estrella' : pop ? 'caballo' : rent ? 'enigma' : 'perro'].push(p) }
-  const caja = (k: string, t: string, c: string, tip: string) => <div className="panel" style={{ borderTop: `4px solid var(--${c})` }} key={k}>
-    <div className="fila"><b style={{ fontFamily: 'var(--f-display)', fontSize: 20, textTransform: 'uppercase' }}>{t}</b><Pill>{g[k].length}</Pill></div>
-    <p className="muted" style={{ fontSize: 12, margin: '2px 0 8px' }}>{tip}</p>
-    <div style={{ fontSize: 14 }}>{g[k].length ? g[k].sort((a, b) => b.cantidad - a.cantidad).map((p) => <div key={p.id}>{p.nombre} <span className="muted mono" style={{ fontSize: 12 }}>×{p.cantidad} · deja {plata(deja(p))}</span></div>) : <span className="muted">—</span>}</div>
+  const caja = (k: string, t: string, e: string, c: string, tip: string) => <div className="cuadrante" style={{ ['--k' as string]: c }} key={k}>
+    <h4><span aria-hidden="true">{e}</span>{t}<Pill>{g[k].length}</Pill></h4><p>{tip}</p>
+    <ul>{g[k].length ? g[k].sort((a, b) => b.cantidad - a.cantidad).slice(0, 8).map((p) => <li key={p.id}>{p.nombre} <span className="muted mono" style={{ fontSize: 12 }}>×{p.cantidad} · deja {plata(deja(p))}</span></li>) : <li className="muted">—</li>}{g[k].length > 8 && <li className="muted">y {g[k].length - 8} más</li>}</ul>
   </div>
-  return <section style={{ marginBottom: 16 }} data-ayuda="matriz"><h3 style={{ marginBottom: 4 }}>Qué platos convienen</h3>
-    <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '72ch' }}>Cruza cuánto se vende cada plato con cuánto deja por unidad, para el período y los filtros elegidos.</p>
-    <div className="rep-grid" style={{ marginTop: 0 }}>
-      {caja('estrella', 'Estrellas', 'ok', 'Se venden mucho y dejan buena plata. Que nunca falten.')}
-      {caja('caballo', 'Caballitos', 'warn', 'Se venden mucho pero dejan poco. Subí el precio o ajustá la porción.')}
-      {caja('enigma', 'Enigmas', 'accent', 'Dejan buena plata pero salen poco. Recomendalos en la mesa.')}
-      {caja('perro', 'Para revisar', 'crit', 'Salen poco y dejan poco. Candidatos a salir de la carta.')}
-    </div></section>
+  return <Bloque titulo="Qué platos convienen" der="cuánto se vende × cuánto deja" ayuda="matriz" className="tb-sep">
+    <div className="cuadrantes">
+      {caja('estrella', 'Estrellas', '⭐', 'var(--t4)', 'Se venden mucho y dejan buena plata. Que nunca falten.')}
+      {caja('caballo', 'Caballitos', '🐴', 'var(--t3)', 'Se venden mucho pero dejan poco. Subí el precio o ajustá la porción.')}
+      {caja('enigma', 'Enigmas', '❓', 'var(--t5)', 'Dejan buena plata pero salen poco. Recomendalos en la mesa.')}
+      {caja('perro', 'Para revisar', '⚠️', 'var(--t6)', 'Salen poco y dejan poco. Candidatos a salir de la carta.')}
+    </div></Bloque>
 }

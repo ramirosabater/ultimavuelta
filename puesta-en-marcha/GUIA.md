@@ -78,6 +78,7 @@ Se pega **una sola vez**, en orden, en **SQL Editor → New query → Run**. La 
 | `06-plato-del-dia.sql` | Plato del día con receta calculada por Chichito; recetas con artículos nuevos (después, volver a publicar la función `ia` con `funciones/ia.ts`) |
 | `07-semana-platos.sql` | La semana de platos del día: plato y porciones por día, se pone solo en la carta el día que toca, y suma a la lista de compras |
 | `08-ticket-gastos-fijos.sql` | Ticket impreso al cobrar (y reimprimir desde la Caja); gastos fijos mensuales que se generan solos; artículos de limpieza, descartables y del local en la tabla de referencia, y agregar propios |
+| `09-juntar-mesas-tableros.sql` | Juntar mesas para grupos grandes; ranking de mesas que más rinden para los tableros nuevos (después, volver a publicar la función `ia`) |
 
 ## Datos de prueba (para mostrar la app)
 - `5-datos-de-prueba.sql`: carga nueve semanas de movimiento inventado (ventas, caja, compras, gastos, mermas, control semanal, reservas y mesas abiertas ahora). Si la carta está vacía, carga la de `3-carta.sql`. Antes tienen que estar pegadas las actualizaciones 01 a 07.

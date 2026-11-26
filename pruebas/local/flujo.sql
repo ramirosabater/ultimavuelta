@@ -380,4 +380,49 @@ select count(*) > 25 as hay_limpieza from referencias where grupo in ('Limpieza 
 \endif
 insert into referencias (nombre, grupo, unidad, propia) values ('Cloro para pileta', 'Limpieza del local', 'L', true);
 reset role;
+\echo '16. Juntar mesas y mesas que más rinden'
+reset role;
+select id as m8, token as t9 from mesas where numero = 8 \gset
+select id as m9 from mesas where numero = 9 \gset
+select id as m10 from mesas where numero = 10 \gset
+select id as gin2 from productos where nombre = 'Gin tonic' \gset
+update mesas set estado = 'libre', abierta = null, junta_con = null where id in (:m8, :m9, :m10);
+delete from pedidos where mesa_id in (:m8, :m9, :m10) and ticket_id is null;
+select pg_temp.como(:'MOZO');
+select abrir_mesa(:m9, 2);
+select cargar_pedido(:m9, jsonb_build_array(jsonb_build_object('producto_id', :gin2, 'cantidad', 1)));
+select juntar_mesas(:m8, array[:m9, :m10]);
+select pg_temp.debe_fallar('select juntar_mesas(' || :m9 || ', array[' || :m10 || '])', 'ya está junta con otra');
+select cargar_pedido(:m10, jsonb_build_array(jsonb_build_object('producto_id', :gin2, 'cantidad', 2)));
+select pg_temp.como('anon');
+select llamar_mozo(:'t9');
+select pg_temp.como(:'MOZO');
+select (select count(*) from pedidos where mesa_id = :m8 and ticket_id is null) = 2 and (select comensales from mesas where id = :m8) = 2
+       and exists (select 1 from llamados where mesa_id = :m8) as junto_ok \gset
+\if :junto_ok
+\else
+  select 1/0 as lo_cargado_no_paso_a_la_principal;
+\endif
+select confirmar_pedido(id) from pedidos where mesa_id = :m8 and not confirmado;
+select atender_llamado(:m8);
+select (cobrar_mesa(:m8, 'Efectivo')->>'total')::numeric > 0 as cobrado \gset
+reset role;
+select (select count(*) from mesas where id in (:m8, :m9, :m10) and estado = 'libre' and junta_con is null) = 3 as sueltas,
+       (select mesas_juntas from tickets order by id desc limit 1) = array[9, 10] as en_ticket \gset
+\if :sueltas
+\else
+  select 1/0 as al_cobrar_no_se_soltaron_las_juntas;
+\endif
+\if :en_ticket
+\else
+  select 1/0 as el_ticket_no_guardo_las_mesas_juntas;
+\endif
+select pg_temp.como(:'MOZO');
+select juntar_mesas(:m8, array[:m9]);
+select separar_mesa(:m9);
+select liberar_mesa(:m8);
+select pg_temp.debe_fallar('select tablero_mesas(current_date - 30, current_date)', 'para dueños y encargados');
+select pg_temp.como(:'ADMIN');
+select format('   mejor mesa: %s · %s mesas con ventas', t->'mesas'->0->>'numero', jsonb_array_length(t->'mesas')) from tablero_mesas(jornada_actual() - 30, jornada_actual()) t;
+reset role;
 \echo 'TODO BIEN'

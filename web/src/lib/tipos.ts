@@ -33,6 +33,7 @@ export interface Mesa {
   id: number; numero: number; zona: string | null; activa: boolean; token: string; estado: EstadoMesa
   abierta: string | null; comensales: number | null; mozo_id: string | null
   tipo: TipoCuenta; nombre: string | null; telefono: string | null; direccion: string | null; temporal: boolean
+  junta_con?: number | null
 }
 /** mesa: una mesa del salón · el resto: cuentas sin mesa (se apagan al cobrarlas) */
 export type TipoCuenta = 'mesa' | 'llevar' | 'delivery' | 'barra' | 'aparte'
