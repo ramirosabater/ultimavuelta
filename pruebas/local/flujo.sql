@@ -341,5 +341,43 @@ select case when :'reaplica' = 'nada' and not (select activo from productos wher
 select pg_temp.como(:'MOZO');
 select pg_temp.debe_fallar('select planificar_plato(jornada_actual() + 3, ' || :guiso || ', 10)', 'Solo dueños y encargados');
 select pg_temp.debe_fallar('select semana_platos()', 'para dueños y encargados');
+\echo '15. Ticket para imprimir y gastos fijos'
+reset role;
+select max(id) as tk_nuevo, min(id) as tk_viejo from tickets \gset
+update tickets set hora = now() - interval '2 days' where id = :tk_viejo;
+select pg_temp.como(:'MOZO');
+select (ticket_para_imprimir(:tk_nuevo)->'t'->>'id') is not null as ticket_ok \gset
+\if :ticket_ok
+\else
+  select 1/0 as el_mozo_no_pudo_imprimir_el_ticket;
+\endif
+select pg_temp.debe_fallar('select ticket_para_imprimir(' || :tk_viejo || ')', 'los reimprime un encargado');
+select pg_temp.debe_fallar('select pagar_gasto(1, 1)', 'Solo dueños');
+select pg_temp.como(:'ADMIN');
+insert into gastos_fijos (concepto, categoria, dia, monto, cuenta_id) values ('Luz', 'Luz, gas y agua', 15, null, (select min(id) from cuentas)), ('Alquiler', 'Alquiler', 5, 900000, null);
+select generar_gastos_fijos() as creados, generar_gastos_fijos() as otra_vez \gset
+select format('   gastos fijos: %s creados, la segunda vez %s', :creados, :otra_vez);
+\if :otra_vez
+  select 1/0 as genero_dos_veces;
+\endif
+select id as luz from gastos where fijo_id = (select id from gastos_fijos where concepto = 'Luz') \gset
+select pg_temp.debe_fallar('select pagar_gasto(' || :luz || ', (select min(id) from cuentas))', 'Poné el monto');
+select pagar_gasto(:luz, (select min(id) from cuentas), null, 85432.5);
+select (select monto from gastos where id = :luz) = 85432.5 and (select estado from gastos where id = :luz) = 'pagado' as luz_ok,
+       (select monto from gastos where fijo_id = (select id from gastos_fijos where concepto = 'Alquiler')) = 900000 as alq_ok \gset
+\if :luz_ok
+\else
+  select 1/0 as el_pago_no_guardo_el_monto;
+\endif
+\if :alq_ok
+\else
+  select 1/0 as el_alquiler_no_tomo_el_monto_fijo;
+\endif
+select count(*) > 25 as hay_limpieza from referencias where grupo in ('Limpieza del local', 'Descartables y mesa', 'Local') \gset
+\if :hay_limpieza
+\else
+  select 1/0 as faltan_los_articulos_de_limpieza;
+\endif
+insert into referencias (nombre, grupo, unidad, propia) values ('Cloro para pileta', 'Limpieza del local', 'L', true);
 reset role;
 \echo 'TODO BIEN'

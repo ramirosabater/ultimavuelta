@@ -15,7 +15,7 @@ const GRUPOS: [string, string[]][] = [
 ]
 const ETIQUETA: Record<string, string> = {
   nombre_local: 'Nombre', bajada_local: 'Segunda línea', corte_jornada: 'Hora de corte', zona_horaria: 'Zona horaria', dias_cerrado: 'Días cerrado',
-  cobertura_dias: 'Comprar para (días)', colchon_pct: 'Colchón (%)', costo_objetivo: 'Costo objetivo (%)', alerta_cocina: 'Parrilla (min amarillo, rojo)', alerta_barra: 'Barra (min amarillo, rojo)',
+  cobertura_dias: 'Comprar para (días)', colchon_pct: 'Colchón (%)', costo_objetivo: 'Costo objetivo (%)', alerta_cocina: 'Cocina (min amarillo, rojo)', alerta_barra: 'Bebidas (min amarillo, rojo)',
   reservas_activas: 'Página de reservas', reservas_horarios: 'Horarios', reservas_cupo: 'Lugares por horario (personas)', reservas_max: 'Máximo de personas por reserva',
   reservas_dias: 'Días de anticipación', reservas_min_horas: 'Hasta cuántas horas antes', reservas_telefono: 'WhatsApp del local',
 }

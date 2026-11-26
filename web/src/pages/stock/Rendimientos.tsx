@@ -19,6 +19,7 @@ export default function Rendimientos() {
   })
   const [nueva, setNueva] = useState(false)
   const [crear, setCrear] = useState<Referencia | null>(null)
+  const [refForm, setRefForm] = useState<null | 'nueva' | Referencia>(null)
   const { correr, ocupado } = useAccion()
   if (error) return <div className="aviso bad">{error}</div>
   if (!datos) return <><SubNavStock /><p className="cargando">Cargando…</p></>
@@ -75,7 +76,8 @@ export default function Rendimientos() {
           <td className="r mono"><b>{pct(1 - p.limpio / p.crudo, 1)}</b></td>
           <td className="r"><button className="btn sm ghost danger" disabled={ocupado} onClick={async () => { if (await correr(async () => { await supabase.from('rendimientos').delete().eq('id', p.id) }, 'Prueba borrada')) recargar() }}>Borrar</button></td></tr>)}
       </tbody></table></div></section>}
-    <TablaReferencia refs={refs} insumos={insumos} onCrear={setCrear} abierta={!pruebas.length} />
+    <TablaReferencia refs={refs} insumos={insumos} onCrear={setCrear} onEditar={setRefForm} abierta={!pruebas.length} />
+    {refForm && <ReferenciaForm r={refForm === 'nueva' ? null : refForm} grupos={porGrupo(refs).map(([g]) => g)} onCerrar={() => setRefForm(null)} onListo={(nueva) => { setRefForm(null); recargar(); if (nueva) setCrear(nueva) }} />}
     {crear && <ArticuloForm insumo={null} desde={crear} proveedores={provs} onCerrar={() => setCrear(null)} onListo={() => { setCrear(null); recargar() }} />}
     {nueva && <NuevaPrueba insumos={insumos} provs={provs} onCerrar={() => setNueva(false)} onListo={() => { setNueva(false); recargar() }} />}
   </>
@@ -109,17 +111,18 @@ function NuevaPrueba({ insumos, provs, onCerrar, onListo }: { insumos: Insumo[];
 }
 
 /** La tabla de referencia completa, para consultar al armar la carta y crear artículos con esos valores */
-function TablaReferencia({ refs, insumos, onCrear, abierta }: { refs: Referencia[]; insumos: Insumo[]; onCrear: (r: Referencia) => void; abierta: boolean }) {
+function TablaReferencia({ refs, insumos, onCrear, onEditar, abierta }: { refs: Referencia[]; insumos: Insumo[]; onCrear: (r: Referencia) => void; onEditar: (r: 'nueva' | Referencia) => void; abierta: boolean }) {
   const [buscar, setBuscar] = useState('')
   const [grupo, setGrupo] = useState('')
   const q = buscar.trim().toLowerCase()
   const lista = refs.filter((r) => (!grupo || r.grupo === grupo) && (!q || `${r.nombre} ${r.grupo}`.toLowerCase().includes(q)))
   return <details className="panel" style={{ marginTop: 16 }} data-ayuda="tabla-referencia" open={abierta}>
-    <summary style={{ cursor: 'pointer' }}><h3 style={{ display: 'inline', marginBottom: 4 }}>Tabla de referencia</h3> <span className="muted" style={{ fontSize: 13 }}>· {refs.length} artículos de cocina y barra</span></summary>
-    <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '76ch' }}>Cuánto se pierde al limpiar, cuánto queda al cocinar y la porción típica de lo que puede entrar en la carta: parrilla, pescados, pollo, guarniciones, pastas, postres y barra. Son valores <b>aproximados</b> de tablas generales (USDA y práctica de cocina) para arrancar; tus pruebas de rendimiento mandan.</p>
+    <summary style={{ cursor: 'pointer' }}><h3 style={{ display: 'inline', marginBottom: 4 }}>Tabla de referencia</h3> <span className="muted" style={{ fontSize: 13 }}>· {refs.length} artículos de cocina, bebidas, limpieza y del local</span></summary>
+    <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '76ch' }}>Cuánto se pierde al limpiar, cuánto queda al cocinar y la porción típica de lo que puede entrar en la carta, más lo que se compra para el local (limpieza, descartables, gas, carbón). Son valores <b>aproximados</b> para arrancar; tus pruebas de rendimiento mandan. Tocá <b>Crear artículo</b> para empezar a comprarlo y llevar su stock. Si falta algo, agregalo.</p>
     <div className="fila" style={{ marginBottom: 10 }}>
       <input id="ref-buscar" type="search" placeholder="Buscar: merluza, arroz, cordero…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ flex: '1 1 200px', width: 'auto' }} />
       <select id="ref-grupo" value={grupo} onChange={(e) => setGrupo(e.target.value)} style={{ flex: '0 1 220px', width: 'auto' }}><option value="">Todos los grupos</option>{porGrupo(refs).map(([g]) => <option key={g}>{g}</option>)}</select>
+      <button className="btn sm pri" id="ref-nueva" onClick={() => onEditar('nueva')}>＋ Agregar a la tabla</button>
     </div>
     {lista.length ? <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th className="r">Limpieza</th><th>Al cocinar</th><th className="r">Porción típica</th><th /></tr></thead><tbody>
       {lista.map((r) => { const ya = insumos.find((i) => i.referencia_id === r.id); return <tr key={r.id}>
@@ -127,7 +130,50 @@ function TablaReferencia({ refs, insumos, onCrear, abierta }: { refs: Referencia
         <td className="r mono">{pct(Number(r.limpieza_pct) / 100)}</td>
         <td style={{ fontSize: 13 }}>{textoRinde(r.rinde_coccion)}{r.coccion && <div className="muted" style={{ fontSize: 12 }}>{r.coccion}</div>}</td>
         <td className="r mono">{r.porcion ? `${num(r.porcion)} ${r.unidad}` : '—'}{r.porcion && r.porcion_es === 'cocido' && Number(r.rinde_coccion) !== 1 && <div className="muted" style={{ fontSize: 11 }}>al plato</div>}</td>
-        <td className="r">{ya ? <Pill tono="ok">{ya.nombre}</Pill> : <button className="btn sm ghost" onClick={() => onCrear(r)}>Crear artículo</button>}</td></tr> })}
-    </tbody></table></div> : <div className="kempty">Nada coincide con la búsqueda.</div>}
+        <td className="r" style={{ whiteSpace: 'nowrap' }}>{r.propia && <button className="btn sm ghost" onClick={() => onEditar(r)}>Editar</button>}{ya ? <Pill tono="ok">{ya.nombre}</Pill> : <button className="btn sm" onClick={() => onCrear(r)}>Crear artículo</button>}</td></tr> })}
+    </tbody></table></div> : <div className="kempty">Nada coincide con la búsqueda. <button className="link" onClick={() => onEditar('nueva')}>Agregalo a la tabla</button></div>}
   </details>
+}
+
+/** Agregar (o corregir) un artículo propio en la tabla de referencia: limpieza, descartables o lo que falte */
+function ReferenciaForm({ r, grupos, onCerrar, onListo }: { r: Referencia | null; grupos: string[]; onCerrar: () => void; onListo: (nueva?: Referencia) => void }) {
+  const [f, setF] = useState({ nombre: r?.nombre ?? '', grupo: r?.grupo ?? 'Limpieza del local', unidad: r?.unidad ?? 'u.', limpieza: String(r?.limpieza_pct ?? 0),
+    rinde: String(Math.round(Number(r?.rinde_coccion ?? 1) * 100)), porcion: r?.porcion != null ? String(r.porcion) : '', nota: r?.nota ?? '' })
+  const [crear, setCrear] = useState(!r)
+  const [err, setErr] = useState('')
+  const { correr, ocupado } = useAccion()
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const comida = !/limpieza|descartable|local/i.test(f.grupo)
+  async function guardar() {
+    if (f.nombre.trim().length < 2) { setErr('Poné el nombre.'); return }
+    if (f.grupo.trim().length < 2) { setErr('Poné el grupo.'); return }
+    const fila = { nombre: f.nombre.trim(), grupo: f.grupo.trim(), unidad: f.unidad.trim() || 'u.', limpieza_pct: comida ? Math.min(90, Math.max(0, Number(f.limpieza) || 0)) : 0,
+      rinde_coccion: comida ? Math.min(6, Math.max(0.01, (Number(f.rinde) || 100) / 100)) : 1, porcion: comida && Number(f.porcion) > 0 ? Number(f.porcion) : null,
+      porcion_es: 'cocido', nota: f.nota.trim() || null, propia: true }
+    let nueva: Referencia | undefined
+    if (await correr(async () => {
+      const q = r ? supabase.from('referencias').update(fila).eq('id', r.id).select().single() : supabase.from('referencias').insert(fila).select().single()
+      const { data, error } = await q
+      if (error) throw new Error(error.code === '23505' ? 'Ya está en la tabla con ese nombre: buscalo.' : error.message)
+      nueva = data as Referencia
+    }, r ? 'Guardado' : 'Agregado a la tabla')) onListo(!r && crear ? nueva : undefined)
+  }
+  async function borrar() {
+    if (await correr(async () => { const { error } = await supabase.from('referencias').delete().eq('id', r!.id); if (error) throw new Error(error.message) }, 'Sacado de la tabla')) onListo()
+  }
+  return <Modal titulo={r ? 'Editar en la tabla' : 'Agregar a la tabla de referencia'} onCerrar={onCerrar}
+    pie={<>{r && <button className="btn ghost danger" disabled={ocupado} onClick={borrar}>Sacar</button>}<span className="grow" /><button className="btn pri" id="rf-ok" disabled={ocupado} onClick={guardar}>Guardar</button></>}>
+    <label className="campo">Nombre<input id="rf-nombre" value={f.nombre} onChange={set('nombre')} placeholder="Lavandina, servilletas, cloro para la pileta…" autoFocus /></label>
+    <div className="two">
+      <label className="campo">Grupo<input id="rf-grupo" list="rf-grupos" value={f.grupo} onChange={set('grupo')} /><datalist id="rf-grupos">{grupos.map((g) => <option key={g} value={g} />)}</datalist></label>
+      <label className="campo">Se mide en<select id="rf-unidad" value={f.unidad} onChange={set('unidad')}>{['u.', 'kg', 'g', 'L', 'ml', 'atados'].map((u) => <option key={u}>{u}</option>)}</select></label>
+    </div>
+    {comida && <div className="two">
+      <label className="campo">Se pierde al limpiar (%)<input id="rf-limp" type="number" min={0} max={90} inputMode="decimal" value={f.limpieza} onChange={set('limpieza')} /></label>
+      <label className="campo">Queda al cocinar (%)<input id="rf-rinde" type="number" min={1} max={600} inputMode="decimal" value={f.rinde} onChange={set('rinde')} /><small>100 si no cambia</small></label>
+    </div>}
+    <label className="campo">Nota (opcional)<input id="rf-nota" value={f.nota} onChange={set('nota')} placeholder="Bidón de 5 L, caja de 100…" /></label>
+    {!r && <label className="check"><input type="checkbox" checked={crear} onChange={(e) => setCrear(e.target.checked)} /> Crear también el artículo para comprarlo y llevar el stock</label>}
+    {err && <div className="err">{err}</div>}
+  </Modal>
 }

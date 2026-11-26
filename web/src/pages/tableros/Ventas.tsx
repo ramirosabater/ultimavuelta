@@ -33,8 +33,8 @@ export default function TableroVentas() {
         <Stat label="Ticket promedio" valor={r.kpi.ticket_prom ? plata(r.kpi.ticket_prom) : '—'} extra={r.kpi.ticket_prom ? d(r.kpi.ticket_prom, r.prev?.ticket_prom) : undefined} />
         <Stat label="Por cubierto" valor={r.kpi.por_cubierto ? plata(r.kpi.por_cubierto) : '—'} extra={r.kpi.por_cubierto ? d(r.kpi.por_cubierto, r.prev?.por_cubierto) : undefined} />
         <Stat label="Permanencia" valor={r.kpi.permanencia != null ? duracion(Number(r.kpi.permanencia)) : '—'} extra={<span className="muted">de abrir a cobrar</span>} />
-        <Stat label="Parrilla" valor={r.kpi.cocina_prom != null ? `${r.kpi.cocina_prom} min` : '—'} extra={r.kpi.cocina_tarde != null ? <span className="muted">{r.kpi.cocina_tarde}% llegó tarde</span> : undefined} />
-        <Stat label="Barra" valor={r.kpi.barra_prom != null ? `${r.kpi.barra_prom} min` : '—'} extra={r.kpi.barra_tarde != null ? <span className="muted">{r.kpi.barra_tarde}% llegó tarde</span> : undefined} />
+        <Stat label="Cocina" valor={r.kpi.cocina_prom != null ? `${r.kpi.cocina_prom} min` : '—'} extra={r.kpi.cocina_tarde != null ? <span className="muted">{r.kpi.cocina_tarde}% llegó tarde</span> : undefined} />
+        <Stat label="Bebidas" valor={r.kpi.barra_prom != null ? `${r.kpi.barra_prom} min` : '—'} extra={r.kpi.barra_tarde != null ? <span className="muted">{r.kpi.barra_tarde}% llegó tarde</span> : undefined} />
       </div>
       {!r.kpi.mesas ? <div className="notice"><b>Sin ventas con estos filtros.</b><br />Probá con otro período o quitá algún filtro.</div> : <>
         <section className="panel" style={{ marginBottom: 16 }}><h3>{r.serie.titulo}</h3><Barras puntos={r.serie.puntos} /></section>

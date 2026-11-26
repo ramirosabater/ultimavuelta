@@ -25,6 +25,7 @@ export interface Insumo {
 export interface Referencia {
   id: number; nombre: string; grupo: string; unidad: string; limpieza_pct: number; rinde_coccion: number
   coccion: string | null; porcion: number | null; porcion_es: 'cocido' | 'limpio'; nota: string | null
+  propia?: boolean
 }
 export interface RecetaItem { producto_id: number; insumo_id: number; cantidad: number; cocido: boolean }
 
@@ -55,10 +56,15 @@ export interface Ticket {
   propina?: number; mesa_nombre?: string | null
   ticket_items?: { nombre: string; cantidad: number; precio: number }[]
 }
+export interface GastoFijo {
+  id: number; concepto: string; categoria: string; proveedor_id: number | null; dia: number; monto: number | null
+  cuenta_id: number | null; activo: boolean; desde: string; nota: string | null
+}
 export interface Gasto {
   id: number; fecha: string; concepto: string; categoria: string; monto: number; proveedor_id: number | null
   estado: 'pagado' | 'pendiente'; cuenta_id: number | null; pagado_el: string | null; vence: string | null
   origen: 'manual' | 'compra' | 'caja'; jornada: string | null; nota: string | null; creado: string
+  fijo_id?: number | null; periodo?: string | null
 }
 export interface MovimientoStock {
   id: number; insumo_id: number | null; producto_id: number | null; tipo: 'venta' | 'compra' | 'ingreso' | 'merma' | 'conteo'
@@ -71,8 +77,8 @@ export const ROLES: Record<Rol, { nombre: string; texto: string }> = {
   admin: { nombre: 'Dueño', texto: 'Todo, incluidos usuarios y configuración' },
   encargado: { nombre: 'Encargado', texto: 'Todo menos usuarios y configuración' },
   mozo: { nombre: 'Mozo', texto: 'Mesas, pedidos y cobrar' },
-  cocina: { nombre: 'Parrilla', texto: 'La pantalla de comandas de parrilla y cocina' },
-  barra: { nombre: 'Barra', texto: 'La pantalla de comandas de barra' },
+  cocina: { nombre: 'Cocina', texto: 'La pantalla de comandas de cocina' },
+  barra: { nombre: 'Bebidas', texto: 'La pantalla de comandas de bebidas' },
 }
 
 export const CAT_GASTO = ['Mercadería', 'Alquiler', 'Sueldos y cargas', 'Luz, gas y agua', 'Internet y teléfono', 'Impuestos y tasas',

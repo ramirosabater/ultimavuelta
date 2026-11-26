@@ -82,8 +82,8 @@ export default function Layout() {
   const grupos: Grupo[] = [
     { t: 'Mesas', to: '/mesas', n: n.salon, roles: ['admin', 'encargado', 'mozo'] },
     { t: 'Reservas', to: '/reservas', n: n.reservas, roles: ['admin', 'encargado', 'mozo'] },
-    { t: 'Parrilla', to: '/cocina', n: n.cocina, roles: ['admin', 'encargado', 'cocina'] },
-    { t: 'Barra', to: '/barra', n: n.barra, roles: ['admin', 'encargado', 'barra'] },
+    { t: 'Cocina', to: '/cocina', n: n.cocina, roles: ['admin', 'encargado', 'cocina'] },
+    { t: 'Bebidas', to: '/barra', n: n.barra, roles: ['admin', 'encargado', 'barra'] },
     { t: 'Caja', to: '/caja', roles: GESTION },
     { t: 'Stock', base: ['/stock'], n: n.stock, roles: GESTION, items: [
       { to: '/stock/articulos', b: 'Artículos', s: 'Lo que comprás: stock, costo, vencimientos', n: n.stock },

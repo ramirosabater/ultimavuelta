@@ -8,7 +8,8 @@ import { numeroFactura } from '../lib/factura'
 import { EstadoFacturaTicket, FacturarTicket } from '../components/facturas'
 import { Cobrar } from '../components/salon'
 import { AutoVacio } from '../components/Autos'
-import { Cabeza, Modal, Pill, Stat, useAccion } from '../components/ui'
+import { Cabeza, Modal, Pill, Stat, useAccion, useToast } from '../components/ui'
+import { imprimirTicket } from '../lib/ticket'
 import { chapaMesa, etiquetaMesa } from '../lib/mesas'
 
 interface PagoT { ticket_id: number; medio: string; monto: number; venta: number }
@@ -44,6 +45,7 @@ export default function Caja() {
   }, [j])
   useEnVivo(['mesas', 'pedidos', 'facturas', 'pedido_cambios'], recargar, 30)
   const { correr } = useAccion()
+  const avisar = useToast()
   const [ventana, setVentana] = useState<Ventana>(null)
 
   if (error) return <div className="aviso bad">{error}</div>
@@ -109,7 +111,7 @@ export default function Caja() {
 
     <section className="panel" style={{ marginTop: 16 }}><h3 style={{ marginBottom: 6 }}>Movimientos de hoy</h3>
       {movs.length ? <div className="tbl-wrap"><table><thead><tr><th>Hora</th><th>Detalle</th><th>Medio</th><th className="r">Importe</th>{factOn && <th>Factura</th>}</tr></thead><tbody>
-        {movs.map((x, i) => <tr key={i}><td className="mono">{hhmm(x.h)}</td><td>{x.txt}</td><td className="muted">{x.med}</td><td className="r mono" style={x.m < 0 ? { color: 'var(--crit)' } : undefined}>{plata(x.m)}</td>
+        {movs.map((x, i) => <tr key={i}><td className="mono">{hhmm(x.h)}</td><td>{x.txt}{x.t && <button className="btn sm ghost" style={{ marginLeft: 6 }} title="Imprimir ticket" onClick={() => imprimirTicket(x.t!.id).catch((e) => avisar(e instanceof Error ? e.message : String(e)))}>🧾 Ticket</button>}</td><td className="muted">{x.med}</td><td className="r mono" style={x.m < 0 ? { color: 'var(--crit)' } : undefined}>{plata(x.m)}</td>
           {factOn && <td>{x.t && Number(x.t.total) > 0 && <EstadoFacturaTicket fs={facturasDe(x.t.id)} sinFactura={x.t.sin_factura} onFacturar={() => setVentana({ facturar: x.t! })}
             onSinFactura={() => correr(async () => { await rpc('ticket_sin_factura', { p_ticket: x.t!.id, p_valor: true }); recargar() }, 'Marcada sin factura')}
             onAnular={(f) => { if (window.confirm(`¿Anular la factura ${numeroFactura(f.punto_venta, f.numero)} de ${plata(f.total)}? Se hace una nota de crédito en ARCA y después la podés volver a facturar.`))

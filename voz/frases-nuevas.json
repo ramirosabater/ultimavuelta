@@ -1,7 +1,19 @@
 [
  {
-  "id": "c49df2e2",
-  "texto": "Pedido sin mesa. Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a parrilla y barra como cualquier mesa."
+  "id": "17434a61",
+  "texto": "2. Cocina. La comanda llega sola acá. La cocina toca Empezar y después Listo, y el mozo ve que tiene que retirar."
+ },
+ {
+  "id": "cb0a3586",
+  "texto": "3. Bebidas. Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida."
+ },
+ {
+  "id": "e4d64cf2",
+  "texto": "Cargá el pedido. Tocá los productos, agregá aclaraciones si hace falta y mandá. Cocina y bebidas lo reciben al instante."
+ },
+ {
+  "id": "926eeacc",
+  "texto": "Pedido sin mesa. Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a cocina y bebidas como cualquier mesa."
  },
  {
   "id": "485dbf10",

@@ -9,7 +9,7 @@ import { Cabeza, Modal, Pill, useAccion } from '../../components/ui'
 import { costoFilas, EstimarReceta, FilasReceta, filasDe, filaVacia, itemsFilas, type FilaReceta } from '../../components/receta'
 
 export const SubNavCarta = () => <SubNav items={[['/carta', 'Carta'], ['/carta/platos', 'Platos del día'], ['/carta/mesas', 'Mesas y QR']]} />
-const EST: Record<Estacion, string> = { cocina: 'Parrilla / cocina', barra: 'Barra' }
+const EST: Record<Estacion, string> = { cocina: 'Cocina', barra: 'Bebidas' }
 
 export default function Carta() {
   const d = useConsulta(async () => {
@@ -86,7 +86,7 @@ function ProductoForm({ prod, cats, catInicial, onCerrar, onListo }: { prod: Pro
       <label className="campo">Precio ($)<input id="pr-precio" type="number" step="any" min={0} inputMode="decimal" value={f.precio} onChange={set('precio')} /></label>
     </div>
     <div className="two">
-      <label className="campo">Se prepara en<select id="pr-est" value={f.estacion} onChange={set('estacion')}><option value="cocina">Parrilla / cocina</option><option value="barra">Barra</option></select></label>
+      <label className="campo">Se prepara en<select id="pr-est" value={f.estacion} onChange={set('estacion')}><option value="cocina">Cocina</option><option value="barra">Bebidas</option></select></label>
       <label className="campo">Orden en la carta<input id="pr-orden" type="number" inputMode="numeric" value={f.orden} onChange={set('orden')} /></label>
     </div>
     <label className="check"><input type="checkbox" id="pr-stock" checked={f.controla_stock} onChange={(e) => setF({ ...f, controla_stock: e.target.checked })} /> Se cuenta por unidad (botellas, latas, porrones)</label>
@@ -106,7 +106,7 @@ function CategoriaForm({ cat, onCerrar, onListo }: { cat: Categoria | null; onCe
         if (await correr(async () => { if (!fila.nombre) throw new Error('Poné un nombre.'); const { error } = cat ? await supabase.from('categorias').update(fila).eq('id', cat.id) : await supabase.from('categorias').insert(fila); if (error) throw new Error(error.code === '23505' ? 'Ya existe esa categoría.' : error.message) }, 'Categoría guardada')) onListo()
       }}>Guardar</button></>}>
     <label className="campo">Nombre<input id="cat-nom" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} autoFocus /></label>
-    <div className="two"><label className="campo">Se prepara en<select id="cat-est" value={f.estacion} onChange={(e) => setF({ ...f, estacion: e.target.value as Estacion })}><option value="cocina">Parrilla / cocina</option><option value="barra">Barra</option></select></label>
+    <div className="two"><label className="campo">Se prepara en<select id="cat-est" value={f.estacion} onChange={(e) => setF({ ...f, estacion: e.target.value as Estacion })}><option value="cocina">Cocina</option><option value="barra">Bebidas</option></select></label>
       <label className="campo">Orden<input id="cat-orden" type="number" inputMode="numeric" value={f.orden} onChange={(e) => setF({ ...f, orden: e.target.value })} /></label></div>
   </Modal>
 }

@@ -44,6 +44,9 @@ begin
   delete from movimientos_stock m using datos_prueba d where d.tabla = 'movimientos_stock' and d.id = m.id::text;
   delete from tickets t using datos_prueba d where d.tabla = 'tickets' and d.id = t.id::text;
   delete from gastos g using datos_prueba d where (d.tabla = 'gastos' and d.id = g.id::text) or (d.tabla = 'compras' and d.id = g.compra_id::text);
+  if to_regclass('public.gastos_fijos') is not null then
+    execute $q$delete from gastos_fijos f using datos_prueba d where d.tabla = 'gastos_fijos' and d.id = f.id::text$q$;
+  end if;
   delete from compras c using datos_prueba d where d.tabla = 'compras' and d.id = c.id::text;
   delete from inventarios i using datos_prueba d where d.tabla = 'inventarios' and d.id = i.id::text;
   delete from rendimientos r using datos_prueba d where d.tabla = 'rendimientos' and d.id = r.id::text;

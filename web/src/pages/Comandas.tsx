@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { leerParametros, rpc, tabla, useConsulta, useEnVivo } from '../lib/datos'
 import { supabase } from '../lib/supabase'
-import { hhmm, minutosDesde } from '../lib/formato'
+import { duracion, hhmm, minutosDesde } from '../lib/formato'
 import { etiquetaMesa } from '../lib/mesas'
 import type { EstadoComanda, Estacion, Mesa, Pedido } from '../lib/tipos'
 import { Items } from '../components/salon'
@@ -14,7 +14,7 @@ const COLUMNAS: { estado: EstadoComanda; titulo: string; boton: string; sigue: E
   { estado: 'listo', titulo: 'Listos', boton: 'Entregado a la mesa', sigue: 'entregado' },
 ]
 
-/** Pantalla de parrilla o de barra: las comandas de esa estación, en vivo */
+/** Pantalla de cocina o de bebidas: las comandas de esa estación, en vivo */
 export default function Comandas({ estacion }: { estacion: Estacion }) {
   const campo = estacion === 'cocina' ? 'est_cocina' : 'est_barra'
   const { datos, recargar, error } = useConsulta(async () => {
@@ -38,7 +38,7 @@ export default function Comandas({ estacion }: { estacion: Estacion }) {
   const [amarillo, rojo] = datos.lim
 
   return <>
-    <Cabeza etiqueta="Comandas" titulo={estacion === 'cocina' ? 'Parrilla y cocina' : 'Barra'}>
+    <Cabeza etiqueta="Comandas" titulo={estacion === 'cocina' ? 'Cocina' : 'Bebidas'}>
       <span className="muted" style={{ fontSize: 13 }}>Alerta a los {amarillo} min, urgente a los {rojo}</span>
     </Cabeza>
     <div className="kds" data-ayuda="comandas">{COLUMNAS.map((c) => {
@@ -49,7 +49,7 @@ export default function Comandas({ estacion }: { estacion: Estacion }) {
           const mm = minutosDesde(p.creado)
           const nivel = c.estado === 'listo' ? '' : mm >= rojo ? 'crit' : mm >= amarillo ? 'warn' : ''
           return <article key={p.id} className={`ticket${nivel ? ` t-${nivel}` : ''}`}>
-            <div className="th"><b>{datos.mesas.get(p.mesa_id) ?? 'Mesa'}</b><Pill tono={nivel as '' | 'warn' | 'crit'}>{hhmm(p.creado)} · {mm} min</Pill></div>
+            <div className="th"><b>{datos.mesas.get(p.mesa_id) ?? 'Mesa'}</b><Pill tono={nivel as '' | 'warn' | 'crit'}>{hhmm(p.creado)} · {duracion(mm)}</Pill></div>
             <Items items={(p.pedido_items ?? []).filter((i) => i.estacion === estacion)} precios={false} />
             <button className={`btn${c.estado === 'listo' ? '' : ' pri'}`} disabled={ocupado}
               onClick={async () => { if (await correr(() => rpc('avanzar_comanda', { p_pedido: p.id, p_estacion: estacion, p_estado: c.sigue }))) recargar() }}>{c.boton}</button>

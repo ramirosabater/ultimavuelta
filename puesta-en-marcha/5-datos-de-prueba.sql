@@ -13,8 +13,8 @@ do $$ begin
   if to_regclass('public.reservas') is null or to_regclass('public.facturas') is null
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tickets' and column_name = 'sin_factura')
      or to_regprocedure('public.anular_compra(bigint)') is null or to_regclass('public.ticket_pagos') is null
-     or to_regclass('public.platos_semana') is null then
-    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 07 (carpeta actualizaciones).';
+     or to_regclass('public.platos_semana') is null or to_regclass('public.gastos_fijos') is null then
+    raise exception 'Antes de cargar los datos de prueba pegá las actualizaciones 01 a 08 (carpeta actualizaciones).';
   end if;
   if to_regclass('public.datos_prueba') is not null then
     raise exception 'Los datos de prueba ya están cargados. Para cargarlos de nuevo, primero corré 6-borrar-datos-de-prueba.sql.';
@@ -573,6 +573,17 @@ begin
               case when v_f <= v_hoy then v_f end, case when v_f > v_hoy then v_f end, 'manual', v_admin) returning id into v_c;
       insert into datos_prueba values ('gastos', v_c::text);
     end loop;
+  end loop;
+
+  -- Los que se repiten todos los meses quedan cargados como gastos fijos (y los de arriba, enganchados a su mes)
+  for r in select * from (values ('Alquiler del local', 'Alquiler', 1800000, 5, 'banco'), ('Luz', 'Luz, gas y agua', null, 18, 'banco'),
+      ('Gas', 'Luz, gas y agua', null, 15, 'banco'), ('Agua', 'Luz, gas y agua', null, 20, 'banco'), ('Internet', 'Internet y teléfono', 42000, 10, 'banco'),
+      ('Monotributo', 'Impuestos y tasas', 210000, 20, 'banco'), ('Tasa municipal', 'Impuestos y tasas', null, 25, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
+    insert into gastos_fijos (concepto, categoria, dia, monto, cuenta_id, desde)
+    values (r.concepto, r.cat, r.dia, r.monto, v_banco, (date_trunc('month', v_ini::timestamp))::date) returning id into v_c;
+    insert into datos_prueba values ('gastos_fijos', v_c::text);
+    update gastos g set fijo_id = v_c, periodo = date_trunc('month', coalesce(g.vence, g.fecha)::timestamp)::date
+    from datos_prueba d where d.tabla = 'gastos' and d.id = g.id::text and g.concepto = r.concepto and g.origen = 'manual';
   end loop;
 
   -- La plata de la caja y de la billetera se pasa al banco una vez por semana

@@ -10,19 +10,19 @@ const SALON: Rol[] = ['admin', 'encargado', 'mozo']
 export const CIRCUITOS: Circuito[] = [
   { id: 'noche', titulo: 'Una noche completa', area: 'mesas', roles: G, pasos: [
     { ir: '/mesas', foco: 'mesas', titulo: '1. Mesas', texto: '¡Hola! Así se ve el salón. Tocás una mesa libre, la abrís con los comensales y cargás el pedido.' },
-    { ir: '/cocina', foco: 'comandas', titulo: '2. Parrilla', texto: 'La comanda llega sola acá. El parrillero toca Empezar y después Listo, y el mozo ve que tiene que retirar.' },
-    { ir: '/barra', foco: 'comandas', titulo: '3. Barra', texto: 'Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida.' },
+    { ir: '/cocina', foco: 'comandas', titulo: '2. Cocina', texto: 'La comanda llega sola acá. La cocina toca Empezar y después Listo, y el mozo ve que tiene que retirar.' },
+    { ir: '/barra', foco: 'comandas', titulo: '3. Bebidas', texto: 'Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida.' },
     { ir: '/caja', foco: 'por-cobrar', titulo: '4. Caja', texto: 'Cuando la mesa pide la cuenta, se cobra con el medio de pago. Al cobrar se descuentan solos los artículos de cada plato.' },
     { ir: '/stock/compras', foco: 'lista-compras', titulo: '5. Compras', texto: 'Al otro día, esta lista te dice qué comprar y cuánto, según lo que se vende cada día de la semana.' },
     { ir: '/tableros/resumen', foco: 'esta-noche', titulo: '6. Tableros', texto: 'Y acá ves cómo vino la noche, el mes y la plata. ¡Listo, ya conocés todo!' },
   ] },
   { id: 'abrir-mesa', titulo: 'Abrir una mesa y tomar el pedido', area: 'mesas', roles: SALON, pasos: [
     { ir: '/mesas', foco: 'mesas', titulo: 'Elegí la mesa', texto: 'Tocá una mesa libre. Se abre el panel con el botón Abrir mesa: poné cuántos son.' },
-    { ir: '/mesas', foco: 'panel-mesa', titulo: 'Cargá el pedido', texto: 'Tocá los productos, agregá aclaraciones si hace falta y mandá. La parrilla y la barra lo reciben al instante.' },
+    { ir: '/mesas', foco: 'panel-mesa', titulo: 'Cargá el pedido', texto: 'Tocá los productos, agregá aclaraciones si hace falta y mandá. Cocina y bebidas lo reciben al instante.' },
     { ir: '/mesas', foco: 'avisos', titulo: 'Los avisos', texto: 'Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar.' },
   ] },
   { id: 'sin-mesa', titulo: 'Para llevar, delivery o barra', area: 'mesas', roles: SALON, pasos: [
-    { ir: '/mesas', foco: 'sin-mesa', titulo: 'Pedido sin mesa', texto: 'Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a parrilla y barra como cualquier mesa.' },
+    { ir: '/mesas', foco: 'sin-mesa', titulo: 'Pedido sin mesa', texto: 'Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a cocina y bebidas como cualquier mesa.' },
     { ir: '/mesas', foco: 'mesas', titulo: 'Arriba de las mesas', texto: 'Las cuentas sin mesa aparecen arriba, con el nombre. Se cobran igual y al cobrarlas desaparecen.' },
   ] },
   { id: 'corregir', titulo: 'Corregir un pedido o separar la cuenta', area: 'mesas', roles: SALON, pasos: [

@@ -16,12 +16,12 @@
   "texto": "1. Mesas. ¡Hola! Así se ve el salón. Tocás una mesa libre, la abrís con los comensales y cargás el pedido."
  },
  {
-  "id": "c637dfc0",
-  "texto": "2. Parrilla. La comanda llega sola acá. El parrillero toca Empezar y después Listo, y el mozo ve que tiene que retirar."
+  "id": "17434a61",
+  "texto": "2. Cocina. La comanda llega sola acá. La cocina toca Empezar y después Listo, y el mozo ve que tiene que retirar."
  },
  {
-  "id": "39dd73de",
-  "texto": "3. Barra. Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida."
+  "id": "cb0a3586",
+  "texto": "3. Bebidas. Los tragos, cervezas y vinos van a esta otra pantalla, separados de la comida."
  },
  {
   "id": "55cd0330",
@@ -40,16 +40,16 @@
   "texto": "Elegí la mesa. Tocá una mesa libre. Se abre el panel con el botón Abrir mesa: poné cuántos son."
  },
  {
-  "id": "1f3ee6a0",
-  "texto": "Cargá el pedido. Tocá los productos, agregá aclaraciones si hace falta y mandá. La parrilla y la barra lo reciben al instante."
+  "id": "e4d64cf2",
+  "texto": "Cargá el pedido. Tocá los productos, agregá aclaraciones si hace falta y mandá. Cocina y bebidas lo reciben al instante."
  },
  {
   "id": "4ae2dc92",
   "texto": "Los avisos. Acá arriba aparecen las mesas que llaman, los pedidos por QR para confirmar y lo que está listo para llevar."
  },
  {
-  "id": "c49df2e2",
-  "texto": "Pedido sin mesa. Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a parrilla y barra como cualquier mesa."
+  "id": "926eeacc",
+  "texto": "Pedido sin mesa. Tocá este botón, elegí para llevar, delivery o barra, poné el nombre del cliente y cargá el pedido. Va a cocina y bebidas como cualquier mesa."
  },
  {
   "id": "485dbf10",

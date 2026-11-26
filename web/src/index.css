@@ -243,3 +243,47 @@ label.btn.disabled { opacity: .45; pointer-events: none; }
 .sub-paso:first-child, .chips + .sub-paso { border-top: 0; }
 .sub-paso .fac-n { width: 22px; height: 22px; font-size: 12px; }
 .sub-paso small { color: var(--muted); font-size: 12px; }
+
+/* Cobro hecho: ticket y factura */
+.cobro-ok { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; }
+.cobro-ok b { font-size: 18px; }
+.cobro-tilde { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 24px; font-weight: 800; }
+.cobro-bloque { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 10px; }
+.opt:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Mesas: en qué paso del circuito está cada una */
+.mesa .etapa { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mesa .etapa b { font-size: 13px; line-height: 1.15; }
+.mesa .etapa small { font-size: 11px; color: var(--muted); line-height: 1.2; }
+.etapa-bar { display: flex; gap: 3px; margin-bottom: 2px; }
+.etapa-bar i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
+.etapa-bar i.h { background: var(--muted); opacity: .55; }
+.etapa-bar i.a { background: var(--c-etapa, var(--ember)); }
+.etapa-1 { --c-etapa: #8a7a66; } .etapa-2 { --c-etapa: var(--warn); } .etapa-3 { --c-etapa: var(--ember); }
+.etapa-4 { --c-etapa: var(--ok); } .etapa-5 { --c-etapa: #3a6ea5; } .etapa-6 { --c-etapa: var(--accent); }
+.mesa.etapa-4 { background: var(--ok-soft); }
+.mesa.etapa-4 .etapa b, .mesa.etapa-2 .etapa b { color: var(--c-etapa); }
+.circuito { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.circuito span { display: inline-flex; align-items: center; gap: 6px; }
+.circuito b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--c-etapa); color: #fff; font-size: 11px; }
+
+/* Compras: pestañas, lista por proveedor */
+.tabs-compras { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab-c { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font: 600 14px var(--f-body); cursor: pointer; }
+.tab-c[aria-selected="true"] { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.tab-c[aria-selected="true"] .pill { background: var(--surface); color: var(--fg); }
+.prov-grupos { display: flex; flex-direction: column; gap: 8px; }
+.prov-grupo { border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; background: var(--surface); }
+.prov-grupo > summary { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; list-style: none; }
+.prov-grupo > summary::-webkit-details-marker { display: none; }
+.prov-grupo > summary::before { content: "▸"; color: var(--muted); }
+.prov-grupo[open] > summary::before { content: "▾"; }
+.prov-grupo[open] > summary { border-bottom: 1px solid var(--line); }
+.lc-fila { gap: 10px; align-items: center; }
+.lc-cant { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; white-space: nowrap; }
+.lc-cant b { font-size: 14px; }
+.platos-hoy { display: flex; flex-wrap: wrap; gap: 6px; }
+.platos-hoy span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--sunk); font-size: 13px; }
+.platos-hoy b { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 999px; background: var(--fg); color: var(--surface); font-size: 13px; }
+.falta-hoy { display: inline-block; margin-right: 12px; }
+.prov-grupo > summary > b { flex: 1; min-width: 0; }

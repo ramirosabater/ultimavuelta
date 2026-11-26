@@ -40,6 +40,9 @@ export default function Compras() {
   const [ventana, setVentana] = useState<null | 'config' | 'manual' | { compra: Insumo; q: number } | { factura: File }>(null)
   const [vHist, setVHist] = useState(0)
   const archivo = useRef<HTMLInputElement>(null)
+  const [buscar, setBuscar] = useState('')
+  const [tab, setTab] = useState<'lista' | 'hoy' | 'cargadas'>(() => { try { return (localStorage.getItem('uv-compras-tab') as 'lista') || 'lista' } catch { return 'lista' } })
+  const cambiarTab = (t: 'lista' | 'hoy' | 'cargadas') => { setTab(t); try { localStorage.setItem('uv-compras-tab', t) } catch { /* sin guardar */ } }
   const avisar = useToast()
   const recargar = () => { base.recargar(); extra.recargar(); setVHist((v) => v + 1) }
 
@@ -55,13 +58,31 @@ export default function Compras() {
   const subas = [...vistos].filter(([id]) => extra.datos!.subas.find((m) => m.insumo_id === id)!.hora.slice(0, 10) >= desde)
     .map(([id, cs]) => ({ i: insumos.find((x) => x.id === id), d: cs.length > 1 ? cs[0] / cs[1] - 1 : 0 })).filter((x) => x.i && x.d > 0.05)
 
-  function texto() {
-    const g = new Map<string, Fila[]>()
-    for (const f of filas) { const k = provDe(f.i, proveedores) || 'Otros'; g.set(k, [...(g.get(k) ?? []), f]) }
+  // La lista, agrupada por proveedor (cada grupo se pide por separado)
+  const grupos = new Map<string, Fila[]>()
+  for (const f of filas) { const k = provDe(f.i, proveedores) || 'Sin proveedor'; grupos.set(k, [...(grupos.get(k) ?? []), f]) }
+  const q = buscar.trim().toLowerCase()
+  const usoHoy = new Map(prev.insumos_hoy.map((x) => [x.id, x.uso]))
+  const faltaHoy = (i: Insumo) => (usoHoy.get(i.id) ?? 0) > Number(i.cantidad)
+  const totalLista = filas.reduce((s, f) => s + f.costo, 0)
+  const urgentes = filas.filter((f) => faltaHoy(f.i))
+  const cuanto = (f: Fila) => f.packs ? `${f.packs} ${f.i.pack_nombre || 'pack'}${f.packs > 1 ? 's' : ''}` : `${num(f.qty)} ${f.i.unidad}`
+  function texto(prov?: string) {
     let t = `Pedido ${par.nombre_local ?? ''} · ${fecha(jornada())}\n`
-    for (const [k, fs] of g) { t += `\n*${k}*\n`; for (const f of fs) t += `- ${f.packs ? `${f.packs} ${f.i.pack_nombre || 'pack'} (${num(f.qty)} ${f.i.unidad})` : `${num(f.qty)} ${f.i.unidad}`} ${f.i.nombre}\n` }
+    for (const [k, fs] of grupos) { if (prov && k !== prov) continue; t += `\n*${k}*\n`; for (const f of fs) t += `- ${cuanto(f)}${f.packs ? ` (${num(f.qty)} ${f.i.unidad})` : ''} ${f.i.nombre}\n` }
     return t
   }
+  async function copiar(prov?: string) {
+    try { await navigator.clipboard.writeText(texto(prov)); avisar(prov ? `Pedido para ${prov} copiado. Pegalo en WhatsApp.` : 'Lista copiada. Pegala en WhatsApp.') } catch { window.prompt?.('Copiá la lista', texto(prov)) }
+  }
+  const platos = prev.platos_hoy.filter((p) => p.estacion === 'cocina').slice(0, 12)
+  const usar = prev.insumos_hoy.map((x) => ({ x, i: insumos.find((y) => y.id === x.id)! })).filter((y) => y.i)
+  const faltan = usar.filter((y) => Number(y.i.cantidad) < y.x.uso), alcanzan = usar.filter((y) => Number(y.i.cantidad) >= y.x.uso)
+  const TABS = [
+    { k: 'lista', t: 'Qué comprar', n: filas.length ? `${filas.length}` : '', ayuda: 'lista-compras' },
+    { k: 'hoy', t: 'Para preparar hoy', n: faltan.length ? `${faltan.length} faltan` : '', ayuda: 'preparar-hoy' },
+    { k: 'cargadas', t: 'Compras cargadas', n: '', ayuda: 'compras-cargadas' },
+  ] as const
 
   return <>
     <Cabeza etiqueta="Depósito" titulo="Compras">
@@ -74,42 +95,58 @@ export default function Compras() {
     <SubNavStock />
     {subas.length > 0 && <div className="alert" style={{ marginBottom: 12 }}><Pill tono="crit">Subas</Pill>
       <span className="grow">{subas.map((x) => `${x.i!.nombre} +${pct(x.d, 1)}`).join(' · ')}. Revisá el costo de los platos en Recetas y costos.</span></div>}
-    <div className="alert" style={{ background: 'var(--sunk)', marginBottom: 16 }}><span className="grow">Compro para <b>{n} día{n > 1 ? 's' : ''}</b> · colchón <b>{colchon}%</b> · cerrado: <b>{cerrado.length ? cerrado.map((d) => DIAS[d]).join(', ') : 'ningún día'}</b></span></div>
 
-    <section className="panel" style={{ marginBottom: 16 }} data-ayuda="preparar-hoy">
-      <h3>Para preparar hoy</h3>
-      <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>Lo que se suele vender un {DIAS_LARGO[prev.dow]} según las últimas 4 semanas. Descongelá y prepará esto, no más.</p>
+    <div className="tabs-compras" role="tablist">{TABS.map((x) => <button key={x.k} role="tab" aria-selected={tab === x.k} className="tab-c" data-ayuda={tab === x.k ? undefined : x.ayuda} onClick={() => cambiarTab(x.k)}>
+      {x.t}{x.n && <span className="pill">{x.n}</span>}</button>)}</div>
+
+    {tab === 'lista' && <section className="panel" data-ayuda="lista-compras">
+      <div className="fila" style={{ marginBottom: 8, gap: 10 }}>
+        <div className="grow" style={{ minWidth: 200 }}>{filas.length ? <><b style={{ fontSize: 17 }}>{filas.length} artículo{filas.length > 1 ? 's' : ''} para comprar</b> · {grupos.size} proveedor{grupos.size > 1 ? 'es' : ''} · <b className="mono">{plata(totalLista)}</b></> : <b>No hace falta comprar nada</b>}
+          <div className="muted" style={{ fontSize: 12 }}>Para {n} día{n > 1 ? 's' : ''} · colchón {colchon}% · cerrado: {cerrado.length ? cerrado.map((d) => DIAS[d]).join(', ') : 'ningún día'}</div></div>
+        {filas.length > 0 && <button className="btn sm" onClick={() => copiar()}>Copiar todo para WhatsApp</button>}
+      </div>
+      {urgentes.length > 0 && <div className="alert" style={{ marginBottom: 10 }}><Pill tono="crit">Para hoy</Pill><span className="grow">No alcanza para esta noche: <b>{urgentes.map((f) => f.i.nombre).join(', ')}</b>.</span></div>}
+      {filas.length > 6 && <input id="lc-buscar" type="search" placeholder="Buscar artículo o proveedor…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ marginBottom: 10 }} />}
+      {filas.length ? <div className="prov-grupos">{[...grupos].map(([k, fs]) => {
+        const vis = fs.filter((f) => !q || `${f.i.nombre} ${k}`.toLowerCase().includes(q))
+        if (!vis.length) return null
+        return <details key={k} className="prov-grupo" open={filas.length <= 12 || grupos.size <= 2 || !!q || fs.some((f) => faltaHoy(f.i))}>
+          <summary><b className="grow">{k}</b><span className="muted">{fs.length} art.</span><span className="mono">{plata(fs.reduce((s, f) => s + f.costo, 0))}</span>
+            {k !== 'Sin proveedor' && <button className="btn sm ghost" onClick={(e) => { e.preventDefault(); copiar(k) }}>Copiar pedido</button>}</summary>
+          <div className="rows">{vis.map((f) => <div key={f.i.id} className="row lc-fila">
+            <div className="grow" style={{ minWidth: 0 }}><b>{f.i.nombre}</b>{faltaHoy(f.i) && <> <Pill tono="crit">para hoy</Pill></>}
+              <div className="muted" style={{ fontSize: 12 }}>hay {num(f.i.cantidad)} {f.i.unidad}{f.uso != null ? ` · se usan ≈ ${num(f.uso)}` : ''}</div></div>
+            <div className="lc-cant"><b className="mono">{cuanto(f)}</b><span className="muted mono">{plata(f.costo)}</span></div>
+            <button className="btn sm" onClick={() => setVentana({ compra: f.i, q: f.qty })}>Llegó</button>
+          </div>)}</div>
+        </details>
+      })}</div> : <div className="kempty">Con lo que hay alcanza para los próximos {n} días.</div>}
+      <details className="muted" style={{ fontSize: 13, marginTop: 10 }}><summary style={{ cursor: 'pointer' }}>¿Cómo se calcula?</summary>{!prev.historial
+        ? 'Todavía no hay historial de ventas, así que por ahora sugiero llegar al mínimo de cada artículo más el colchón. Con unas noches cobradas, la lista se calcula sola por lo que se vende cada día de la semana.'
+        : `Lo que se va a usar los próximos ${n} días según las recetas, lo vendido esos mismos días las semanas anteriores y los platos del día planificados (Carta y QR → Platos del día), más el colchón (el ${colchon}% o el mínimo del artículo, lo que sea mayor), menos lo que ya hay. Redondeado a la presentación de compra.`}</details>
+    </section>}
+
+    {tab === 'hoy' && <section className="panel" data-ayuda="preparar-hoy">
+      <p className="muted" style={{ fontSize: 13, margin: '0 0 10px' }}>Lo que se suele vender un {DIAS_LARGO[prev.dow]} según las últimas 4 semanas. Descongelá y prepará esto, no más.</p>
       {!prev.historial ? <div className="kempty">Hacen falta algunas noches de ventas cobradas para estimar.</div>
         : prev.cerrado_hoy ? <div className="kempty">Hoy el local está cerrado.</div>
         : !prev.platos_hoy.length ? <div className="kempty">Sin ventas para estimar este día.</div>
-        : <div className="rep-grid" style={{ marginTop: 0 }}>
-          <div style={{ minWidth: 0 }}><div className="label" style={{ marginBottom: 4 }}>Platos esperados</div><div className="rows">
-            {prev.platos_hoy.filter((p) => p.estacion === 'cocina').slice(0, 10).map((p) => <div className="row" key={p.id}><span className="grow">{p.nombre}</span><span className="num mono">≈ {Math.max(1, Math.round(p.cantidad))}</span></div>)}</div></div>
-          <div style={{ minWidth: 0 }}><div className="label" style={{ marginBottom: 4 }}>Artículos que se van a usar</div><div className="rows">
-            {prev.insumos_hoy.slice(0, 12).map((x) => { const i = insumos.find((y) => y.id === x.id); if (!i) return null
-              return <div className="row" key={x.id}><span className="grow">{i.nombre}</span><span className="mono">{num(x.uso)} {i.unidad}</span>{Number(i.cantidad) < x.uso ? <Pill tono="crit">Falta {num(x.uso - Number(i.cantidad))}</Pill> : <Pill tono="ok">Hay</Pill>}</div> })}</div></div>
-        </div>}
-    </section>
+        : <>
+          {faltan.length > 0 ? <div className="alert" style={{ marginBottom: 12 }}><Pill tono="crit">Falta</Pill><span className="grow">{faltan.map((y) => <span key={y.i.id} className="falta-hoy"><b>{y.i.nombre}</b> {num(y.x.uso - Number(y.i.cantidad))} {y.i.unidad}</span>)}</span>
+            <button className="btn sm" onClick={() => cambiarTab('lista')}>Ver qué comprar</button></div>
+            : <div className="aviso ok" style={{ marginBottom: 12 }}>Hay todo lo que se va a usar esta noche.</div>}
+          <div className="label" style={{ marginBottom: 6 }}>Platos que se esperan esta noche</div>
+          <div className="platos-hoy">{platos.map((p) => <span key={p.id}><b className="mono">{Math.max(1, Math.round(p.cantidad))}</b>{p.nombre}</span>)}</div>
+          <div className="label" style={{ margin: '14px 0 6px' }}>Qué preparar</div>
+          <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th className="r">Preparar</th><th className="r">Hay</th><th /></tr></thead><tbody>
+            {[...faltan, ...alcanzan].map(({ x, i }) => <tr key={i.id}><td><b>{i.nombre}</b></td><td className="r mono">{num(x.uso)} {i.unidad}</td><td className="r mono muted">{num(i.cantidad)}</td>
+              <td className="r">{Number(i.cantidad) < x.uso ? <Pill tono="crit">Falta {num(x.uso - Number(i.cantidad))}</Pill> : <Pill tono="ok">Hay</Pill>}</td></tr>)}
+          </tbody></table></div>
+        </>}
+    </section>}
 
-    <section className="panel" data-ayuda="lista-compras">
-      <div className="fila" style={{ marginBottom: 4 }}><h3 className="grow">Lista de compras</h3>
-        {filas.length > 0 && <button className="btn sm" onClick={async () => { try { await navigator.clipboard.writeText(texto()); avisar('Lista copiada. Pegala en WhatsApp.') } catch { setVentana(null); window.prompt?.('Copiá la lista', texto()) } }}>Copiar para WhatsApp</button>}</div>
-      <p className="muted" style={{ fontSize: 13, margin: '0 0 8px', maxWidth: '75ch' }}>{!prev.historial
-        ? 'Todavía no hay historial de ventas, así que por ahora sugiero llegar al mínimo de cada artículo más el colchón. Con unas noches cobradas, la lista se calcula sola por lo que se vende cada día de la semana.'
-        : `Lo que se va a usar los próximos ${n} días según las recetas, lo vendido esos mismos días las semanas anteriores y los platos del día planificados (Carta y QR → Platos del día), más el colchón (el ${colchon}% o el mínimo del artículo, lo que sea mayor), menos lo que ya hay. Redondeado a la presentación de compra.`}</p>
-      {filas.length ? <>
-        <div className="tbl-wrap"><table><thead><tr><th>Artículo</th><th className="r">Hay</th><th className="r">Se usará</th><th className="r">Comprar</th><th className="r">Estimado</th><th /></tr></thead><tbody>
-          {filas.map((f) => <tr key={f.i.id}><td><b>{f.i.nombre}</b>{provDe(f.i, proveedores) && <div className="muted" style={{ fontSize: 12 }}>{provDe(f.i, proveedores)}</div>}</td>
-            <td className="r mono">{num(f.i.cantidad)} {f.i.unidad}</td><td className="r mono muted">{f.uso == null ? '—' : num(f.uso)}</td>
-            <td className="r mono"><b>{f.packs ? `${f.packs} × ${f.i.pack_nombre || 'pack'}` : `${num(f.qty)} ${f.i.unidad}`}</b>{f.packs ? <span className="muted"> ({num(f.qty)} {f.i.unidad})</span> : null}</td>
-            <td className="r mono">{plata(f.costo)}</td>
-            <td className="r"><button className="btn sm" onClick={() => setVentana({ compra: f.i, q: f.qty })}>Llegó</button></td></tr>)}
-        </tbody></table></div>
-        <div className="total-row"><span className="label">Total estimado</span><span className="num">{plata(filas.reduce((s, f) => s + f.costo, 0))}</span></div>
-      </> : <div className="kempty">No hace falta comprar nada para los próximos {n} días.</div>}
-    </section>
+    {tab === 'cargadas' && <Historial version={vHist} onCambio={recargar} />}
 
-    <Historial version={vHist} onCambio={recargar} />
 
     {ventana === 'manual' && <CompraManualModal insumos={insumos} proveedores={proveedores} cuentas={cuentas} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); recargar() }} />}
     {ventana === 'config' && <ConfigCompras par={par} onCerrar={() => setVentana(null)} onListo={() => { setVentana(null); extra.recargar() }} />}
@@ -148,18 +185,31 @@ function Historial({ version, onCambio }: { version: number; onCambio: () => voi
   const [abierta, setAbierta] = useState<number | null>(null)
   const [anular, setAnular] = useState<CompraH | null>(null)
   const { correr, ocupado } = useAccion()
-  const lista = h.datos ?? []
-  return <section className="panel" style={{ marginTop: 16 }} data-ayuda="compras-cargadas">
-    <div className="fila" style={{ marginBottom: 4 }}><h3 className="grow">Compras cargadas</h3>{lista.length > 0 && <span className="muted mono" style={{ fontSize: 13 }}>{plata(lista.reduce((s, c) => s + Number(c.total), 0))} en 30 días</span>}</div>
+  const [buscar, setBuscar] = useState('')
+  const [prov, setProv] = useState('')
+  const todas = h.datos ?? []
+  const q = buscar.trim().toLowerCase()
+  const lista = todas.filter((c) => (!prov || (c.proveedores?.nombre ?? 'Sin proveedor') === prov)
+    && (!q || `${c.proveedores?.nombre ?? ''} ${c.numero ?? ''} ${c.movimientos_stock.map((m) => m.insumos?.nombre ?? '').join(' ')}`.toLowerCase().includes(q)))
+  const porProv = new Map<string, number>()
+  for (const c of todas) { const k = c.proveedores?.nombre ?? 'Sin proveedor'; porProv.set(k, (porProv.get(k) ?? 0) + Number(c.total)) }
+  const resumen = (c: CompraH) => { const ns = c.movimientos_stock.map((m) => m.insumos?.nombre ?? '—'); return ns.slice(0, 3).join(', ') + (ns.length > 3 ? ` y ${ns.length - 3} más` : '') }
+  return <section className="panel" data-ayuda="compras-cargadas">
+    <div className="fila" style={{ marginBottom: 8 }}><h3 className="grow">Compras de los últimos 30 días</h3>{todas.length > 0 && <b className="mono">{plata(todas.reduce((s, c) => s + Number(c.total), 0))}</b>}</div>
+    {porProv.size > 1 && <div className="chips" style={{ marginBottom: 10 }}>
+      <button className="chip" aria-pressed={!prov} onClick={() => setProv('')}>Todos</button>
+      {[...porProv].sort((x, y) => y[1] - x[1]).map(([k, v]) => <button key={k} className="chip" aria-pressed={prov === k} onClick={() => setProv(prov === k ? '' : k)}>{k} · {plata(v)}</button>)}</div>}
+    {todas.length > 5 && <input id="cc-buscar" type="search" placeholder="Buscar por artículo, proveedor o número de factura…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ marginBottom: 10 }} />}
     {h.error ? <div className="aviso bad">{h.error}</div> : !h.datos ? <p className="cargando">Cargando…</p>
-      : !lista.length ? <div className="kempty">Todavía no cargaste compras en los últimos 30 días.</div>
+      : !todas.length ? <div className="kempty">Todavía no cargaste compras en los últimos 30 días.</div>
+      : !lista.length ? <div className="kempty">Nada coincide con la búsqueda.</div>
       : <div className="rows">{lista.map((c) => <div key={c.id} className="row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
         <div className="fila" style={{ flexWrap: 'nowrap' }}>
-          <button className="link grow" style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit', fontSize: 14 }} aria-expanded={abierta === c.id} onClick={() => setAbierta(abierta === c.id ? null : c.id)}>
-            <b>{fecha(c.fecha)}</b> · {c.proveedores?.nombre ?? 'Sin proveedor'}{c.numero ? <span className="muted"> · {c.numero}</span> : null}
-            <div className="muted" style={{ fontSize: 12 }}>{c.movimientos_stock.length} artículo{c.movimientos_stock.length === 1 ? '' : 's'}{c.perfiles?.nombre ? ` · cargó ${c.perfiles.nombre}` : ''}</div>
+          <button className="link grow" style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit', fontSize: 14, minWidth: 0 }} aria-expanded={abierta === c.id} onClick={() => setAbierta(abierta === c.id ? null : c.id)}>
+            <span className="mono muted" style={{ marginRight: 8 }}>{fecha(c.fecha)}</span><b>{c.proveedores?.nombre ?? 'Sin proveedor'}</b>{c.numero ? <span className="muted"> · {c.numero}</span> : null}
+            <div className="muted" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{abierta === c.id ? '▾ ' : '▸ '}{resumen(c)}{c.perfiles?.nombre ? ` · cargó ${c.perfiles.nombre}` : ''}</div>
           </button>
-          <span className="mono" style={{ whiteSpace: 'nowrap' }}>{plata(c.total)}</span>
+          <b className="mono" style={{ whiteSpace: 'nowrap' }}>{plata(c.total)}</b>
         </div>
         {abierta === c.id && <div style={{ paddingLeft: 4 }}>
           {c.movimientos_stock.map((m, k) => <div key={k} className="fila" style={{ fontSize: 13, flexWrap: 'nowrap' }}><span className="grow">{m.insumos?.nombre ?? '—'}</span>

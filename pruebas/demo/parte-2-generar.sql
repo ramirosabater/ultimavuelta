@@ -309,6 +309,17 @@ begin
     end loop;
   end loop;
 
+  -- Los que se repiten todos los meses quedan cargados como gastos fijos (y los de arriba, enganchados a su mes)
+  for r in select * from (values ('Alquiler del local', 'Alquiler', 1800000, 5, 'banco'), ('Luz', 'Luz, gas y agua', null, 18, 'banco'),
+      ('Gas', 'Luz, gas y agua', null, 15, 'banco'), ('Agua', 'Luz, gas y agua', null, 20, 'banco'), ('Internet', 'Internet y teléfono', 42000, 10, 'banco'),
+      ('Monotributo', 'Impuestos y tasas', 210000, 20, 'banco'), ('Tasa municipal', 'Impuestos y tasas', null, 25, 'banco')) v(concepto, cat, monto, dia, cuenta) loop
+    insert into gastos_fijos (concepto, categoria, dia, monto, cuenta_id, desde)
+    values (r.concepto, r.cat, r.dia, r.monto, v_banco, (date_trunc('month', v_ini::timestamp))::date) returning id into v_c;
+    insert into datos_prueba values ('gastos_fijos', v_c::text);
+    update gastos g set fijo_id = v_c, periodo = date_trunc('month', coalesce(g.vence, g.fecha)::timestamp)::date
+    from datos_prueba d where d.tabla = 'gastos' and d.id = g.id::text and g.concepto = r.concepto and g.origen = 'manual';
+  end loop;
+
   -- La plata de la caja y de la billetera se pasa al banco una vez por semana
   for k in 0..8 loop
     v_f := v_ini + 7 * k + 2;

@@ -14,6 +14,22 @@ import { Cabeza, Pill, useAccion } from '../components/ui'
 const ESTADO = { pendiente: 'Pendiente', preparando: 'En preparación', listo: 'Listo', entregado: 'Entregado' } as const
 const TONO = { pendiente: 'warn', preparando: 'acc', listo: 'ok', entregado: '' } as const
 
+// El circuito de una mesa, en el orden en que pasa
+const CIRCUITO = ['Sentados', 'Pedido en cola', 'Preparando', 'Listo para llevar', 'Comiendo', 'Pidió la cuenta'] as const
+/** En qué paso del circuito está la mesa (1 a 6) y qué decir. Si hay varios pedidos, manda lo que pide acción del mozo. */
+function etapa(m: Mesa, ps: Pedido[]): { n: number; txt: string; donde?: string } | null {
+  if (m.estado === 'libre' && !ps.length) return null
+  if (m.estado === 'cuenta') return { n: 6, txt: 'Pidió la cuenta' }
+  const conf = ps.filter((p) => p.confirmado)
+  const donde = (est: string) => [conf.some((p) => p.est_cocina === est) && 'cocina', conf.some((p) => p.est_barra === est) && 'bebidas'].filter(Boolean).join(' y ')
+  if (donde('listo')) return { n: 4, txt: 'Listo para llevar', donde: `retirar de ${donde('listo')}` }
+  if (ps.some((p) => !p.confirmado)) return { n: 2, txt: 'Pedido QR por confirmar' }
+  if (donde('preparando')) return { n: 3, txt: 'Preparando', donde: `en ${donde('preparando')}` }
+  if (donde('pendiente')) return { n: 2, txt: 'Pedido en cola', donde: `esperando en ${donde('pendiente')}` }
+  if (conf.length) return { n: 5, txt: 'Comiendo', donde: 'todo entregado' }
+  return { n: 1, txt: 'Sentados', donde: 'sin pedido todavía' }
+}
+
 type Ventana = null | 'cuenta' | { tipo: 'abrir' | 'pedido' | 'cobrar' | 'mover' | 'separar'; mesa: Mesa } | { tipo: 'item'; mesa: Mesa; item: PedidoItem; prep: boolean }
 
 export default function Mesas() {
@@ -58,15 +74,20 @@ export default function Mesas() {
 
   const tarjeta = (m: Mesa) => {
     const ps = deMesa(m.id), tot = totalMesa(m.id)
-    const llama = llamados.some((l) => l.mesa_id === m.id), hayQr = ps.some((p) => !p.confirmado)
-    const hayListo = ps.some((p) => p.confirmado && (p.est_cocina === 'listo' || p.est_barra === 'listo'))
-    return <button key={m.id} className={`mesa ${m.estado}${m.temporal ? ' suelta' : ''}${sel === m.id ? ' sel' : ''}`} onClick={() => setSel(sel === m.id ? null : m.id)} aria-label={etiquetaMesa(m)}>
+    const llama = llamados.some((l) => l.mesa_id === m.id)
+    const e = etapa(m, ps)
+    return <button key={m.id} className={`mesa ${m.estado}${m.temporal ? ' suelta' : ''}${sel === m.id ? ' sel' : ''}${e ? ` etapa-${e.n}` : ''}`} onClick={() => setSel(sel === m.id ? null : m.id)} aria-label={etiquetaMesa(m)}>
       <span className="n">{chapaMesa(m)}</span>
       {m.temporal && <span className="quien">{m.nombre}</span>}
-      <span className="s">{m.estado === 'libre' ? (ps.length ? 'Pedido sin abrir' : reservaDe(m) ? 'Reservada' : 'Libre') : m.estado === 'cuenta' ? 'Pidió la cuenta' : `${m.temporal ? '' : 'Ocupada · '}${duracion(minutosDesde(m.abierta!))}`}</span>
+      {e ? <span className="etapa" title={e.donde}>
+          <span className="etapa-bar" aria-hidden="true">{CIRCUITO.map((_, i) => <i key={i} className={i + 1 < e.n ? 'h' : i + 1 === e.n ? 'a' : ''} />)}</span>
+          <b>{e.txt}</b>{e.donde && <small>{e.donde}</small>}
+        </span>
+        : <span className="s">{reservaDe(m) ? 'Reservada' : 'Libre'}</span>}
+      {m.estado !== 'libre' && <span className="s">{duracion(minutosDesde(m.abierta!))}</span>}
       {m.estado === 'libre' && reservaDe(m) && <span className="res">{hora(reservaDe(m)!.hora)} · {reservaDe(m)!.nombre} ({reservaDe(m)!.personas})</span>}
       {(m.estado !== 'libre' || ps.length > 0) && <span className="t">{plata(tot)}</span>}
-      <span className="badges">{llama && <Pill tono="crit">Llama</Pill>}{hayQr && <Pill tono="warn">QR</Pill>}{hayListo && <Pill tono="ok">Listo</Pill>}</span>
+      <span className="badges">{llama && <Pill tono="crit">Llama</Pill>}</span>
     </button>
   }
 
@@ -87,7 +108,7 @@ export default function Mesas() {
       </div>)}
       {listos.map((p) => <div key={`r${p.id}`} className="alert" style={{ background: 'var(--ok-soft)' }}>
         <Pill tono="ok">Listo</Pill>
-        <span className="grow"><b>{etiquetaMesa(mesaDe(p.mesa_id))}</b> · retirar de {[p.est_cocina === 'listo' && 'parrilla', p.est_barra === 'listo' && 'barra'].filter(Boolean).join(' y ')}</span>
+        <span className="grow"><b>{etiquetaMesa(mesaDe(p.mesa_id))}</b> · retirar de {[p.est_cocina === 'listo' && 'cocina', p.est_barra === 'listo' && 'bebidas'].filter(Boolean).join(' y ')}</span>
         <button className="btn sm" disabled={ocupado} onClick={() => accion(() => rpc('entregar_pedido', { p_pedido: p.id }), 'Entregado')}>Entregado</button>
       </div>)}
     </div>}
@@ -106,13 +127,13 @@ export default function Mesas() {
         {sueltas.length > 0 && <><div className="label" style={{ margin: '0 0 6px' }}>Sin mesa</div>
           <div className="grid-mesas sueltas" style={{ marginBottom: 14 }}>{sueltas.map((m) => tarjeta(m))}</div></>}
         <div className="grid-mesas" data-ayuda="mesas">{fijas.map((m) => tarjeta(m))}</div>
-        <div className="legend"><span>Libre</span><span className="lo">Ocupada</span><span className="lc">Pidió la cuenta</span></div>
+        <div className="circuito" aria-label="El circuito de la mesa">{CIRCUITO.map((c, i) => <span key={c} className={`etapa-${i + 1}`}><b>{i + 1}</b>{c}</span>)}</div>
       </div>
 
       {mesa && <aside className="panel side" data-ayuda="panel-mesa">
         <div className="fila"><div className="grow"><div className="label">{mesa.temporal ? ({ llevar: 'Para llevar', delivery: 'Delivery', barra: 'Barra', aparte: 'Cuenta aparte', mesa: 'Mesa' } as const)[mesa.tipo] : 'Mesa'}</div><h2>{mesa.temporal ? mesa.nombre : mesa.numero}</h2></div><button className="btn sm ghost" onClick={() => setSel(null)}>Cerrar</button></div>
         {mesa.estado !== 'libre' ? <dl className="kv">
-          <dt>Estado</dt><dd>{mesa.estado === 'cuenta' ? <Pill tono="acc">Pidió la cuenta</Pill> : <Pill>Ocupada</Pill>}</dd>
+          <dt>Estado</dt><dd>{(() => { const e = etapa(mesa, deMesa(mesa.id)); return e ? <><Pill tono={e.n === 4 ? 'ok' : e.n === 6 ? 'acc' : e.n === 2 || e.n === 3 ? 'warn' : ''}>{e.n} · {e.txt}</Pill>{e.donde && <small className="muted"> {e.donde}</small>}</> : <Pill>Ocupada</Pill> })()}</dd>
           <dt>Abierta</dt><dd className="mono">{hhmm(mesa.abierta!)} · {duracion(minutosDesde(mesa.abierta!))}</dd>
           {mesa.telefono ? <><dt>Teléfono</dt><dd><a href={`https://wa.me/549${mesa.telefono.replace(/^0/, '')}`} target="_blank" rel="noreferrer">{mesa.telefono}</a></dd></> : null}
           {mesa.direccion ? <><dt>Dirección</dt><dd>{mesa.direccion}</dd></> : null}
@@ -125,8 +146,8 @@ export default function Mesas() {
             <span className="mono muted">{hhmm(p.creado)}</span>
             {p.origen === 'qr' && <Pill>QR</Pill>}
             {!p.confirmado ? <Pill tono="warn">Sin confirmar</Pill> : <>
-              {p.est_cocina && <Pill tono={TONO[p.est_cocina]}>Parrilla: {ESTADO[p.est_cocina]}</Pill>}
-              {p.est_barra && <Pill tono={TONO[p.est_barra]}>Barra: {ESTADO[p.est_barra]}</Pill>}
+              {p.est_cocina && <Pill tono={TONO[p.est_cocina]}>Cocina: {ESTADO[p.est_cocina]}</Pill>}
+              {p.est_barra && <Pill tono={TONO[p.est_barra]}>Bebidas: {ESTADO[p.est_barra]}</Pill>}
             </>}
           </div>
           <Items items={p.pedido_items ?? []} onItem={p.confirmado ? (i) => setVentana({ tipo: 'item', mesa, item: i as PedidoItem, prep: ((i as PedidoItem).estacion === 'cocina' ? p.est_cocina : p.est_barra) !== 'pendiente' }) : undefined} />

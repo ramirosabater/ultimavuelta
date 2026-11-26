@@ -134,3 +134,18 @@ table th { font-weight: 800; }
 .items .item-mas { margin-left: 2px; padding: 0 8px; min-height: 26px; line-height: 1; box-shadow: none; }
 .mesa .quien { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .campo .fila .btn.sm { white-space: nowrap; flex: none; }
+
+/* Comandas compactas: entran más en pantalla (dos por columna cuando hay lugar) */
+.kds { gap: 12px; }
+.kds .kcol { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-content: start; gap: 8px; }
+.kds .kcol > h3, .kds .kcol > .kempty, .kds .kcol > :not(.ticket) { grid-column: 1 / -1; }
+.kds .kcol > h3 { font-size: 16px; padding-bottom: 6px; margin: 0; }
+.kds .ticket { padding: 7px 9px 8px; font-size: 13px; border-width: 2px; box-shadow: 2px 2px 0 var(--tinta); }
+.kds .ticket .th { margin-bottom: 4px; gap: 6px; flex-wrap: wrap; }
+.kds .ticket .th b { font-size: 16px; padding: 0 8px; border-width: 2px; box-shadow: none; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kds .ticket .th .pill { font-size: 11px; padding: 1px 7px; }
+.kds .ticket .items li { font-size: 13px; gap: 6px; }
+.kds .ticket .items .nota { font-size: 11px; padding-left: 2.4em; }
+.kds .ticket .btn { margin-top: 6px; min-height: 34px; padding: 4px 10px; font-size: 13px; }
+.kds .ticket .btn::after { display: none; }
+.kds .auto-vacio, .kds .kcol > div:not(.ticket) { padding: 10px; }

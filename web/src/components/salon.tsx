@@ -7,6 +7,8 @@ import { Modal, Pill, useAccion } from './ui'
 import { TIPOS_CUENTA, etiquetaMesa } from '../lib/mesas'
 import { facturarTicket, type EstadoFacturacion, type Receptor } from '../lib/factura'
 import { CamposReceptor, ResultadoFactura } from './facturas'
+import { imprimirTicket } from '../lib/ticket'
+import { useAuth } from '../auth/AuthProvider'
 
 /** La carta para cargar pedidos (solo lo activo) */
 export function useCarta() {
@@ -103,6 +105,7 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
   const medios = useConsulta(() => tabla<MedioPago[]>(supabase.from('medios_pago').select('*').eq('activo', true).order('orden')))
   const destino = useConsulta(() => rpc<string>('jornada_caja'))
   const fac = useConsulta(() => rpc<EstadoFacturacion | null>('facturacion_estado').catch(() => null))
+  const { perfil } = useAuth()
   const [conFactura, setConFactura] = useState<boolean | null>(null)
   const [receptor, setReceptor] = useState<Receptor>({})
   // Después de cobrar: el ticket y cómo salió la factura
@@ -144,9 +147,19 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
     try { setFactura(await facturarTicket(t.id, receptor)) } catch (e) { setErrFactura(e instanceof Error ? e.message : String(e)) } finally { setFacturando(false) }
   }
   if (cobrado) return <Modal titulo={`${etiquetaMesa(mesa)} cobrada · ${plata(cobrado.total)}`} onCerrar={onListo}
-    pie={<><span className="grow" /><button className="btn" onClick={onListo}>Listo</button></>}>
-    {facturando && !factura && !errFactura ? <p className="muted">Pidiendo la factura a ARCA…</p>
-      : <ResultadoFactura f={factura} error={errFactura} ocupado={facturando} onReintentar={() => pedirFactura(cobrado)} />}
+    pie={<><span className="grow" /><button className="btn" id="c-listo" onClick={onListo}>Listo</button></>}>
+    <div className="cobro-ok"><span className="cobro-tilde">✓</span><b>Cobro registrado</b><span className="muted">Ticket N° {cobrado.id}</span></div>
+    <div className="cobro-bloque">
+      <div className="label">Ticket</div>
+      <button className="btn pri" id="c-ticket" onClick={() => imprimirTicket(cobrado.id).catch((e) => setErrFactura(e instanceof Error ? e.message : String(e)))}>🧾 Imprimir ticket</button>
+      <small className="muted">Comprobante para el cliente (no es factura).</small>
+    </div>
+    <div className="cobro-bloque">
+      <div className="label">Factura ARCA</div>
+      {!facturar ? <span className="muted">{facturable ? 'Sin factura. Si después hace falta, se factura desde la Caja.' : 'No se hizo: la facturación con ARCA todavía no está activada.'}</span>
+        : facturando && !factura && !errFactura ? <p className="muted" style={{ margin: 0 }}>Pidiendo la factura a ARCA…</p>
+        : <ResultadoFactura f={factura} error={errFactura} ocupado={facturando} onReintentar={() => pedirFactura(cobrado)} />}
+    </div>
   </Modal>
   return <Modal titulo={`Cobrar · ${etiquetaMesa(mesa)}`} onCerrar={onCerrar}
     pie={<><div className="grow"><div className="label">Total a cobrar</div><div className="mono" style={{ fontWeight: 600, fontSize: 22 }}>{plata(aCobrar)}</div>
@@ -158,9 +171,10 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
         const como = pagos ? pagos.filter((p) => Number(p.monto) > 0).map((p) => p.medio).join(' + ') : elegido
         if (!(await correr(async () => { t = await rpc<{ id: number; total: number }>('cobrar_mesa', args) }, `Cobrado ${plata(aCobrar)} · ${como}`))) return
         if (facturable && !facturar && t) await rpc('ticket_sin_factura', { p_ticket: (t as { id: number }).id, p_valor: true }).catch(() => {})
-        if (!facturar || !t || Number((t as { total: number }).total) <= 0) { onListo(); return }
-        setCobrado(t); pedirFactura(t)
-      }}>{facturar ? 'Cobrar y facturar' : facturable ? 'Cobrar sin factura' : 'Confirmar cobro'}</button></>}>
+        if (!t) return
+        setCobrado(t)
+        if (facturar && Number((t as { total: number }).total) > 0) pedirFactura(t)
+      }}>{facturar ? 'Cobrar y facturar' : 'Confirmar cobro'}</button></>}>
     {destino.datos && destino.datos !== jornada() && <div className="notice">La caja de hoy ya está cerrada: este cobro va a la jornada del <b>{fecha(destino.datos)}</b>.</div>}
     <Items items={agrupados} />
     <div className="total-row" style={{ borderTopWidth: 1 }}><span className="label">Subtotal</span><span className="num" style={{ fontSize: 16 }}>{plata(sub)}</span></div>
@@ -196,12 +210,16 @@ export function Cobrar({ mesa, items, onCerrar, onListo }: { mesa: Mesa; items: 
       </div>}
     {d > 0 && <div className="muted">Descuento: −{plata(sub - total)}</div>}
     {partes > 1 && <span className="pill acc" style={{ fontSize: 14, padding: '6px 12px', alignSelf: 'flex-start' }}>{plata(aCobrar / partes)} por persona</span>}
-    {facturable && <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-      <label className="fila" style={{ gap: 8, fontWeight: 600 }}><input id="c-factura" type="checkbox" checked={facturar} onChange={(e) => setConFactura(e.target.checked)} style={{ width: 20, height: 20 }} />
-        Hacer Factura C{fac.datos!.ambiente === 'homologacion' && <span className="pill">modo prueba</span>}</label>
-      {facturar ? <CamposReceptor r={receptor} set={setReceptor} total={total} tope={fac.datos!.tope} />
+    <div className="campo" style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+      <span>Factura ARCA {facturable && fac.datos!.ambiente === 'homologacion' && <span className="pill">modo prueba</span>}</span>
+      <div className="opts" id="c-factura">
+        <button className="opt" aria-pressed={!facturar} onClick={() => setConFactura(false)}>Sin factura</button>
+        <button className="opt" aria-pressed={facturar} disabled={!facturable} onClick={() => setConFactura(true)}>Con factura C</button>
+      </div>
+      {!facturable ? <small className="muted">La facturación con ARCA todavía no está activada{perfil?.rol === 'admin' ? <> (se activa en <b>Administración → Facturación</b>)</> : ' (la activa un dueño)'}. Igual se imprime el ticket.</small>
+        : facturar ? <CamposReceptor r={receptor} set={setReceptor} total={total} tope={fac.datos!.tope} />
         : <small className="muted">Esta venta se cobra sin factura. Si después hace falta, se factura desde la Caja.</small>}
-    </div>}
+    </div>
   </Modal>
 }
 
@@ -236,7 +254,7 @@ export function AbrirCuenta({ onCerrar, onListo }: { onCerrar: () => void; onLis
     <label className="campo">Nombre<input id="ac-nombre" maxLength={40} placeholder={tipo === 'barra' ? 'Ej.: Juan, el de la gorra' : 'Ej.: Juan Pérez'} value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus /></label>
     {tipo !== 'barra' && <label className="campo">Teléfono {tipo === 'llevar' && <small>(opcional, para avisarle)</small>}<input id="ac-tel" inputMode="tel" placeholder="297 4…" value={tel} onChange={(e) => setTel(e.target.value)} /></label>}
     {tipo === 'delivery' && <label className="campo">Dirección<input id="ac-dir" maxLength={120} placeholder="Calle, número, barrio" value={dir} onChange={(e) => setDir(e.target.value)} /></label>}
-    <p className="muted" style={{ margin: 0, fontSize: 13 }}>Va a parrilla y barra como cualquier mesa. Al cobrarla, desaparece de la pantalla.</p>
+    <p className="muted" style={{ margin: 0, fontSize: 13 }}>Va a cocina y bebidas como cualquier mesa. Al cobrarla, desaparece de la pantalla.</p>
   </Modal>
 }
 
