@@ -67,6 +67,7 @@ export default function Layout() {
     if (platoAplicado.current === jornada()) return
     platoAplicado.current = jornada()
     supabase.rpc('aplicar_plato_del_dia').then(() => {}, () => {})
+    supabase.rpc('registrar_ingreso').then(() => {}, () => {})
   }, [pathname])
   useEnVivo(['pedidos', 'llamados', 'reservas'], contar, 30)
 
@@ -106,6 +107,7 @@ export default function Layout() {
       { to: '/admin/usuarios', b: 'Usuarios', s: 'Quién entra y qué puede hacer', roles: ['admin'] },
       { to: '/admin/facturacion', b: 'Facturación', s: 'Factura electrónica con ARCA', roles: ['admin'] },
       { to: '/admin/configuracion', b: 'Configuración', s: 'Nombre, jornada, compras y alertas', roles: ['admin'] },
+      { to: '/admin/registro', b: 'Registro', s: 'Todo lo que pasó: quién, qué y cuándo', roles: ['admin'] },
     ] },
     { t: 'Carta y QR', base: ['/carta'], roles: GESTION, items: [
       { to: '/carta', b: 'Carta', s: 'Productos, precios y categorías' },

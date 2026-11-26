@@ -425,4 +425,31 @@ select pg_temp.debe_fallar('select tablero_mesas(current_date - 30, current_date
 select pg_temp.como(:'ADMIN');
 select format('   mejor mesa: %s · %s mesas con ventas', t->'mesas'->0->>'numero', jsonb_array_length(t->'mesas')) from tablero_mesas(jornada_actual() - 30, jornada_actual()) t;
 reset role;
+\echo '17. Registro'
+select pg_temp.como(:'MOZO');
+select count(*) = 0 as mozo_no_ve from registro \gset
+\if :mozo_no_ve
+\else
+  select 1/0 as el_mozo_ve_el_registro;
+\endif
+select registrar_ingreso();
+select pg_temp.como(:'ADMIN');
+select count(*) filter (where importante) > 5 and count(*) filter (where usuario = 'Juan' and texto like 'Cobró Mesa 1%') = 1
+       and count(*) filter (where texto like 'Sacado%' or texto like 'Invitado%') >= 2 and count(*) filter (where texto = 'Entró a la app' and usuario = 'Juan') = 1
+       and count(*) filter (where texto like 'Juntó la mesa%') >= 2 and count(*) filter (where texto like 'Precio de%') >= 1 as registro_ok from registro \gset
+\if :registro_ok
+\else
+  select 1/0 as al_registro_le_falta_algo;
+\endif
+reset role;
+set uv.sin_registro = 'on';
+select count(*) as antes from registro \gset
+update productos set precio = precio + 1 where id = (select min(id) from productos);
+select count(*) = :antes as sin_anotar from registro \gset
+reset uv.sin_registro;
+\if :sin_anotar
+\else
+  select 1/0 as los_datos_de_prueba_se_anotan;
+\endif
+select format('   registro: %s movimientos, %s importantes', count(*), count(*) filter (where importante)) from registro;
 \echo 'TODO BIEN'

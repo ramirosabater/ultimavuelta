@@ -35,15 +35,15 @@ begin
     perform exigir(found and o.activa and not o.temporal, 'Una de las mesas no es del salón.');
     perform exigir(o.junta_con is null or o.junta_con = pr.id, format('La mesa %s ya está junta con otra.', o.numero));
     perform exigir(not exists (select 1 from mesas where junta_con = o.id), format('La mesa %s tiene otras juntas: juntá todo en esa.', o.numero));
+    v_com := v_com + coalesce(o.comensales, 0);
+    update mesas set junta_con = pr.id, estado = 'ocupada', abierta = coalesce(o.abierta, pr.abierta), comensales = null,
+                     mozo_id = coalesce(o.mozo_id, pr.mozo_id) where id = o.id;
     -- Lo que tenía cargado pasa a la principal
     update pedidos set mesa_id = pr.id where mesa_id = o.id and ticket_id is null;
     if exists (select 1 from llamados where mesa_id = o.id) then
       insert into llamados (mesa_id) values (pr.id) on conflict (mesa_id) do nothing;
       delete from llamados where mesa_id = o.id;
     end if;
-    v_com := v_com + coalesce(o.comensales, 0);
-    update mesas set junta_con = pr.id, estado = 'ocupada', abierta = coalesce(o.abierta, pr.abierta), comensales = null,
-                     mozo_id = coalesce(o.mozo_id, pr.mozo_id) where id = o.id;
   end loop;
   if v_com > 0 then update mesas set comensales = coalesce(comensales, 0) + v_com where id = pr.id; end if;
 end $$;

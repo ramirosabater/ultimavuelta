@@ -9,6 +9,9 @@
 --   Antes tienen que estar pegadas las actualizaciones 01 a 07.
 -- =====================================================================
 
+-- Lo que hace este archivo no se anota en el registro
+set uv.sin_registro = 'on';
+
 do $$ begin
   if to_regclass('public.reservas') is null or to_regclass('public.facturas') is null
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tickets' and column_name = 'sin_factura')
@@ -708,6 +711,8 @@ begin
     end if;
   end loop;
 end $$;
+
+reset uv.sin_registro;
 
 select format('Listo: %s ventas en %s noches, %s compras, %s gastos, %s reservas y %s mesas abiertas ahora.',
   (select count(*) from datos_prueba where tabla = 'tickets'), (select count(*) from datos_prueba where tabla = 'jornadas'),

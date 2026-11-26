@@ -443,6 +443,8 @@ begin
   end loop;
 end $$;
 
+reset uv.sin_registro;
+
 select format('Listo: %s ventas en %s noches, %s compras, %s gastos, %s reservas y %s mesas abiertas ahora.',
   (select count(*) from datos_prueba where tabla = 'tickets'), (select count(*) from datos_prueba where tabla = 'jornadas'),
   (select count(*) from datos_prueba where tabla = 'compras'), (select count(*) from datos_prueba where tabla = 'gastos'),

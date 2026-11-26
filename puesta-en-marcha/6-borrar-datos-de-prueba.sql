@@ -10,6 +10,9 @@
 --   Se pega una vez en Supabase → SQL Editor → Run.
 -- =====================================================================
 
+-- Lo que hace este archivo no se anota en el registro
+set uv.sin_registro = 'on';
+
 do $$ begin
   if to_regclass('public.datos_prueba') is null then raise exception 'No hay datos de prueba cargados.'; end if;
 end $$;
@@ -72,3 +75,5 @@ end $$;
 
 drop table datos_prueba, datos_prueba_antes;
 select 'Datos de prueba borrados. La base quedó como antes.' as resultado;
+
+reset uv.sin_registro;

@@ -9,6 +9,7 @@ import { ToastProvider } from './components/ui'
 import type { Rol } from './lib/tipos'
 
 // Las pantallas se cargan cuando se usan: el celular del mozo no baja los tableros
+const Registro = lazy(() => import('./pages/admin/Registro'))
 const Mesas = lazy(() => import('./pages/Mesas'))
 const Comandas = lazy(() => import('./pages/Comandas'))
 const Caja = lazy(() => import('./pages/Caja'))
@@ -76,6 +77,7 @@ function Privado() {
         <Route path="finanzas" element={<Solo roles={G}><TFinanzas /></Solo>} />
       </Route>
       <Route path="admin">
+        <Route path="registro" element={<Solo roles={['admin']}><Registro /></Solo>} />
         <Route index element={<Navigate to="gastos" replace />} />
         <Route path="proveedores" element={<Solo roles={G}><Proveedores /></Solo>} />
         <Route path="gastos" element={<Solo roles={G}><Gastos /></Solo>} />
