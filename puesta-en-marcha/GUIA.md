@@ -105,6 +105,16 @@ Monotributo: la app hace **Factura C** al cobrar cada mesa, directo con ARCA, co
    "Sin factura" en la Caja (se pueden facturar después) y no cuentan como pendientes. Si la mayoría no se factura, en
    Facturación se destilda "Al cobrar, la factura viene tildada".
 
+## "No soy un robot" en el ingreso (Cloudflare Turnstile)
+
+Es gratis. Se hace en este orden, porque si se activa en Supabase antes de que la app muestre el cuadrito, nadie puede entrar.
+
+1. **Cloudflare** (dash.cloudflare.com, crear cuenta si no hay) → **Turnstile** → **Add widget**: nombre "Última Vuelta", dominio `ultimavuelta.netlify.app`, modo **Managed**. Da dos claves: la **Site key** (pública) y la **Secret key** (privada).
+2. **Netlify** → el sitio → **Site configuration → Environment variables** → agregar `VITE_TURNSTILE_SITE_KEY` con la **Site key**. Después **Deploys → Trigger deploy → Clear cache and deploy site**. Abrir la app en una ventana de incógnito: en el ingreso tiene que aparecer el cuadrito.
+3. **Supabase** → **Authentication → Attack Protection** (o *Bot and Abuse Protection*) → **Enable CAPTCHA protection** → proveedor **Turnstile** → pegar la **Secret key** → **Save**.
+
+Para sacarlo: primero se apaga en Supabase y después se borra la variable en Netlify. Además, tras 5 contraseñas mal seguidas la app hace esperar un minuto.
+
 ## Rutina recomendada
 
 | Cuándo | Qué | Dónde |
